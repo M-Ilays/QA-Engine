@@ -12,13 +12,13 @@ export function LandingPage() {
             {env.demoMode ? <DemoBadge /> : null}
           </div>
           <h1 className="font-display text-5xl font-bold tracking-tight text-white sm:text-6xl md:text-7xl">
-            GemmaQA
+            QA Engine
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-tide-300 sm:text-xl">
             From URL to test coverage, workflows, and evidence-backed bugs.
           </p>
           <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-slate-400">
-            GemmaQA is an autonomous exploratory testing agent powered by Gemma. It opens
+            QA Engine is an autonomous exploratory testing agent. It opens
             authorized web applications, understands their structure, explores workflows,
             executes safe QA checks, captures evidence, and produces synchronized testing
             documentation.
@@ -32,7 +32,7 @@ export function LandingPage() {
             </Link>
           </div>
           <p className="mx-auto mt-8 max-w-xl text-xs leading-relaxed text-slate-500">
-            Only test systems you own or are explicitly authorized to test. GemmaQA is for
+            Only test systems you own or are explicitly authorized to test. QA Engine is for
             authorized QA use only.
           </p>
         </div>

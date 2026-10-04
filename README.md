@@ -52,14 +52,16 @@ New Run starts AgentController + Playwright. Gemini is optional, not required.
 
 Full write-up: [`ARCHITECTURE.md`](ARCHITECTURE.md). Diagram for judges:
 
-![GemmaQA architecture](docs/architecture.png)
+![QA Engine architecture](docs/architecture.png)
 
 ```
-GemmaQA UI / API
-  → AgentController
-    → chosen model (Gemini, Ollama, Mock, …)
-    → Playwright
-    → Target website
+QA Engine UI
+  → FastAPI (chat and runs)
+    → AgentController
+      → optional model (Gemini, Ollama, Transformers, Mock)
+      → Playwright Chromium
+      → authorized website
+    → SQLite, screenshots, reports
 ```
 
 | Layer | Stack |

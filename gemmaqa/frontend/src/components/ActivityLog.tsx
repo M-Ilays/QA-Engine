@@ -4,7 +4,7 @@ import type { ActivityRecord, NormalizedWsEvent } from "../types";
 import { clockFromIso, isActionActivityEvent } from "../utils/liveAction";
 
 /**
- * The run's activity log: what GemmaQA did, when, and how long it took.
+ * The run's activity log: what QA Engine did, when, and how long it took.
  *
  * Replaces a timeline that lived only in browser memory, capped at 250 events,
  * rendered truncated raw JSON, and was lost on refresh — which is exactly why an
@@ -44,7 +44,7 @@ export function formatActivityLogText(
   opts: { runId: string; phaseFilter?: string | null } = { runId: "" },
 ): string {
   const filterNote = opts.phaseFilter ? `  filter=${opts.phaseFilter}` : "";
-  const header = `GemmaQA activity log  run=${opts.runId || "unknown"}  ${records.length} steps${filterNote}`;
+  const header = `QA Engine activity log  run=${opts.runId || "unknown"}  ${records.length} steps${filterNote}`;
   if (!records.length) return `${header}\n(empty)`;
   const lines = records.map((record) => {
     const time = elapsed(record.elapsed_ms);

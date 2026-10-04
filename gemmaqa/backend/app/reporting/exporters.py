@@ -44,7 +44,7 @@ class ReportExporter:
         path = self.out_dir / "final_report.md"
         sec = sections or report.sections_markdown
         parts = [
-            "# GemmaQA Synchronized QA Report",
+            "# QA Engine Synchronized QA Report",
             "",
             f"**Run ID:** `{report.run_id}`  ",
             f"**Target:** `{report.target_url}`  ",
@@ -93,7 +93,7 @@ class ReportExporter:
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>GemmaQA Report {html.escape(report.run_id[:8])}</title>
+  <title>QA Engine Report {html.escape(report.run_id[:8])}</title>
   <style>
     :root {{ --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --accent:#0f766e; --bg:#f8fafc; }}
     body {{ margin:0; font-family: "Segoe UI", system-ui, sans-serif; color:var(--ink); background:var(--bg); }}
@@ -116,7 +116,7 @@ class ReportExporter:
 </head>
 <body>
   <header>
-    <h1>GemmaQA Report</h1>
+    <h1>QA Engine Report</h1>
     <p>Run <code>{html.escape(report.run_id)}</code> · {html.escape(report.target_url)}</p>
     {cov_banner}
   </header>

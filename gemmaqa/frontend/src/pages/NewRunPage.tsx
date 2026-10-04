@@ -270,7 +270,7 @@ export function NewRunPage() {
         <fieldset className="rounded-xl border border-white/10 bg-ink-950/40 px-3 py-3">
           <legend className="label px-1">Write permissions</legend>
           <p className="mb-3 px-1 text-xs text-slate-400">
-            GemmaQA only reads unless you allow it to write. To test create/read/update/delete
+            QA Engine only reads unless you allow it to write. To test create/read/update/delete
             behaviour it has to be able to submit a form and create a record.
           </p>
           <div className="grid gap-3">
@@ -287,7 +287,7 @@ export function NewRunPage() {
             />
             <Toggle
               label="Allow test-data creation"
-              hint="Create records, clearly tagged as GemmaQA test data. Required for any CRUD testing."
+              hint="Create records, clearly tagged as QA Engine test data. Required for any CRUD testing."
               checked={Boolean(form.configuration.allow_safe_test_data_creation)}
               onChange={(v) =>
                 setForm({
@@ -297,8 +297,8 @@ export function NewRunPage() {
               }
             />
             <Toggle
-              label="Allow deletion of GemmaQA's own test records"
-              hint="Lets GemmaQA remove the records it created, instead of leaving them behind. It never deletes data it did not create."
+              label="Allow deletion of QA Engine's own test records"
+              hint="Lets QA Engine remove the records it created, instead of leaving them behind. It never deletes data it did not create."
               danger
               checked={Boolean(form.configuration.allow_destructive_actions)}
               onChange={(v) =>

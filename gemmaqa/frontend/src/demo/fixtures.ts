@@ -465,7 +465,7 @@ const DEMO_PROVIDER_CATALOG: ProviderCatalog = {
 type DemoExportKind = "json" | "md" | "html" | "bugs.csv" | "tests.csv" | "navigation.mmd";
 
 export const demoApi = {
-  health: async () => ({ status: "ok", app: "GemmaQA", version: "0.1.0-demo" }),
+  health: async () => ({ status: "ok", app: "QA Engine", version: "0.1.0-demo" }),
   listProviders: async (): Promise<ProviderCatalog> => DEMO_PROVIDER_CATALOG,
   setProvider: async (_provider: string): Promise<ProviderCatalog> => {
     void _provider;

@@ -153,7 +153,7 @@ async def test_action_generation_reaches_the_real_prompt_builder():
     for marker in ("known_element_ids", "allowed_actions", "Response schema"):
         assert marker in user, f"prompt is missing {marker!r} — build_action_prompt was bypassed"
     # And the system prompt is the centralized template, not something ad hoc.
-    assert "GemmaQA" in provider.last_system_prompt
+    assert "QA Engine" in provider.last_system_prompt
 
 
 @pytest.mark.asyncio

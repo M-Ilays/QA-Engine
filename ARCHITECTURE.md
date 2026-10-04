@@ -1,77 +1,45 @@
-# GemmaQA Architecture
+# QA Engine Architecture
 
 ## System Overview
 
-GemmaQA is an autonomous QA testing agent for **QA and development teams**. It supports **exploratory testing**, **retesting** after a fix, and **regression** smoke passes on the same authorized web app. The API starts an Agent Controller, which drives the browser. It does not replace a scripted regression suite or a full QA strategy.
+QA Engine is an autonomous testing agent for **QA and development teams**. It supports **exploratory testing**, **retesting** after a fix, and **regression** smoke passes on the same authorized web app. Chat or New Run asks the API to start an Agent Controller, which drives the browser. It does not replace a scripted regression suite or a full QA strategy.
 
 ---
 
 ## Architecture Diagram
 
-![GemmaQA architecture](docs/architecture.png)
+![QA Engine architecture](docs/architecture.png)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        User Interface                            │
-│                   (React + Vite Frontend)                        │
-│                                                                   │
-│  • Create QA runs                                                │
-│  • View real-time activity logs                                  │
-│  • Review test reports                                           │
-│  • Configure testing parameters                                  │
+│                     React UI (Vite)                              │
+│  Chat · New Run · live activity · bugs · test cases · reports   │
+│  Pause / Continue / End                                          │
 └───────────────────────────┬─────────────────────────────────────┘
-                            │
-                            │ HTTP/REST API
-                            │
+                            │ HTTP and WebSocket
                             ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                      FastAPI Backend                             │
-│                      (Python, Port 8000)                         │
 │                                                                   │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │              Agent Controller                             │  │
-│  │              (Page-by-Page QA Engine)                     │  │
-│  │                                                            │  │
-│  │  Core Loop:                                                │  │
-│  │    1. Observe → Extract page information                  │  │
-│  │    2. Classify → Categorize page type                     │  │
-│  │    3. Plan → Decide what actions to take                  │  │
-│  │    4. Execute → Perform actions via Playwright            │  │
-│  │    5. Report → Log findings and evidence                  │  │
-│  │                                                            │  │
-│  │  Features:                                                 │  │
-│  │   - Form detection and testing                            │  │
-│  │   - Navigation discovery                                  │  │
-│  │   - Bug detection                                          │  │
-│  │   - Screenshot capture                                     │  │
-│  │   - Activity logging                                       │  │
-│  └─────────────────────────┬─────────────────────────────────┘  │
-│                            │                                      │
-└────────────────────────────┼──────────────────────────────────────┘
-                             │
-                             │ Playwright API
-                             │
-                             ▼
-                  ┌──────────────────────┐
-                  │     Playwright       │
-                  │  (Browser Automation)│
-                  │                      │
-                  │  • Chromium Driver   │
-                  │  • Page Interaction  │
-                  │  • Screenshot Tool   │
-                  └──────────┬───────────┘
-                             │
-                             │ Browser Protocol
-                             │
-                             ▼
-                  ┌──────────────────────┐
-                  │   Target Website     │
-                  │   (Under Test)       │
-                  │                      │
-                  │  • Forms             │
-                  │  • Pages             │
-                  │  • Navigation        │
-                  └──────────────────────┘
+│   Run and Chat API          Agent Controller        Optional model│
+│   start, pause, end    →    Observe · Classify  ←   Gemini        │
+│   scope and test type       Plan one safe action    Ollama        │
+│                             Execute · validate      Transformers  │
+│                             Write cases and bugs    Mock          │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │ Playwright
+                            ▼
+        ┌──────────────────────┐      ┌──────────────────────┐
+        │  Chromium            │ ───► │  Authorized website  │
+        │  click, type, submit │      │  forms, pages, nav   │
+        └──────────┬───────────┘      └──────────────────────┘
+                   │
+                   ▼
+        ┌──────────────────────┐
+        │  Evidence            │
+        │  SQLite, screenshots │
+        │  reports, live log   │
+        └──────────────────────┘
 ```
 
 ---
@@ -93,7 +61,7 @@ GemmaQA is an autonomous QA testing agent for **QA and development teams**. It s
 
 **Communication:**
 - REST API calls to FastAPI backend
-- Real-time updates via polling
+- Live activity over WebSocket
 
 ---
 
@@ -197,7 +165,7 @@ Log activity ← ← ← ← ← ← ← Report findings
     ↓
 Store in database
     ↓
-Frontend polls for updates
+Frontend receives live updates over WebSocket
     ↓
 Display in activity log
 ```
@@ -298,7 +266,7 @@ Frontend (localhost:5173) ← → Backend (localhost:8000)
 | Frontend | React + TypeScript + Vite | User interface |
 | Backend | Python + FastAPI | REST API |
 | QA engine | AgentController | Observe, plan, execute, report |
-| LLM | Chosen model (Gemini, Ollama, Mock) | Reasoning and planning |
+| LLM | Gemini, Ollama, Transformers, or Mock | Page reasoning when a model is selected |
 | Automation | Playwright | Browser control |
 | Runtime | Chromium | Browser execution |
 | Optional | Gemini/Ollama | Alternative LLM providers |

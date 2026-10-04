@@ -98,7 +98,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    app_name: str = "GemmaQA"
+    app_name: str = "QA Engine"
     app_version: str = "0.1.0"
     debug: bool = True
     # Prefer localhost for demos; the API has no authentication layer.

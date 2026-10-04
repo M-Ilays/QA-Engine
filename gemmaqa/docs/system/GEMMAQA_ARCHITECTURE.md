@@ -1,4 +1,4 @@
-# GemmaQA Architecture
+# QA Engine Architecture
 
 **Status:** Authoritative architectural description, derived from repository inspection.
 **Verified baseline:** 1133 tests passed, 1 skipped, 0 failed (full backend suite).
@@ -42,6 +42,19 @@ Each principle below is stated only to the extent the code actually demonstrates
 ---
 
 ## 3. High-level architecture
+
+```mermaid
+flowchart TD
+    UI["React UI\nChat, New Run, live log, reports"] --> API["FastAPI\nruns, chat, WebSocket"]
+    API --> Controller["AgentController\nobserve, classify, plan, execute, report"]
+    Controller --> Model["Optional model\nGemini, Ollama, Transformers, Mock"]
+    Controller --> Playwright["Playwright Chromium"]
+    Playwright --> Site["Authorized website"]
+    Controller --> Evidence["SQLite, screenshots, bugs, test cases"]
+    Evidence --> UI
+```
+
+The loop inside AgentController:
 
 ```mermaid
 flowchart TD

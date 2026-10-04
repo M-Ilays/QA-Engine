@@ -61,7 +61,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="Autonomous Exploratory Testing Agent powered by Gemma + Playwright",
+    description="Autonomous exploratory testing with Playwright",
     lifespan=lifespan,
 )
 

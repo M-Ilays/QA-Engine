@@ -306,7 +306,7 @@ class GenericFormWorkflow:
     # plus a run/timestamp fragment, see app.agent.test_data_generator) and,
     # once verified, registered in app.agent.temporary_record_registry for
     # the SEPARATE cleanup-planning step to act on.
-    rollback_hint: str = "Created values are tagged as GemmaQA test data; see the Temporary Record Registry for cleanup status."
+    rollback_hint: str = "Created values are tagged as QA Engine test data; see the Temporary Record Registry for cleanup status."
 
     @classmethod
     def start(

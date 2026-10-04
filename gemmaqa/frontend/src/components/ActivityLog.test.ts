@@ -35,14 +35,14 @@ describe("formatActivityLogText", () => {
       { runId: "abc-123" },
     );
 
-    expect(text).toContain("GemmaQA activity log  run=abc-123  2 steps");
+    expect(text).toContain("QA Engine activity log  run=abc-123  2 steps");
     expect(text).toContain("00:04  planning        Planning next action  61.0s");
     expect(text).toContain("01:05  execution       Filled first name");
   });
 
   it("notes an empty log and an active phase filter", () => {
     expect(formatActivityLogText([], { runId: "r1" })).toBe(
-      "GemmaQA activity log  run=r1  0 steps\n(empty)",
+      "QA Engine activity log  run=r1  0 steps\n(empty)",
     );
     expect(formatActivityLogText([rec({ seq: 1, summary: "Paused" })], { runId: "r1", phaseFilter: "lifecycle" })).toContain(
       "filter=lifecycle",

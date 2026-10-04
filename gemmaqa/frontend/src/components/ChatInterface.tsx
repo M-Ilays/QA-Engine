@@ -215,8 +215,8 @@ export const ChatInterface: React.FC = () => {
       {/* ── Header ── */}
       <header className="chat-header-bar">
         <Link to="/" className="chat-back-btn">← Back</Link>
-        <span className="chat-header-title">GemmaQA Chat</span>
-        <span className="chat-header-subtitle">Talk to your QA agent</span>
+        <span className="chat-header-title">QA Engine Chat</span>
+        <span className="chat-header-subtitle">Talk to QA Engine</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <button
             className={`btn-header-toggle ${showSettings ? 'active' : ''}`}
@@ -331,7 +331,7 @@ export const ChatInterface: React.FC = () => {
                       onChange={e => updateSetting('allowTestDataCreation', e.target.checked)} />
                     <div>
                       <span>Allow test-data creation</span>
-                      <span className="check-hint">Create records clearly tagged as GemmaQA test data.</span>
+                      <span className="check-hint">Create records clearly tagged as QA Engine test data.</span>
                     </div>
                   </label>
                   <label className="check-item">
@@ -339,7 +339,7 @@ export const ChatInterface: React.FC = () => {
                       onChange={e => updateSetting('allowDeletion', e.target.checked)} />
                     <div>
                       <span>Allow deletion of own test records</span>
-                      <span className="check-hint">Only deletes records GemmaQA created.</span>
+                      <span className="check-hint">Only deletes records QA Engine created.</span>
                     </div>
                   </label>
                 </div>
@@ -453,7 +453,7 @@ export const ChatInterface: React.FC = () => {
 
                 {activeConversation.messages.map(msg => (
                   <div key={msg.id} className={`message msg-${msg.role}`}>
-                    <div className="msg-role">{msg.role === 'user' ? '👤 You' : '🤖 GemmaQA'}</div>
+                    <div className="msg-role">{msg.role === 'user' ? '👤 You' : '🤖 QA Engine'}</div>
                     <div className="msg-content">{msg.content}</div>
                     {msg.runId && (
                       <a href={`/runs/${msg.runId}`} className="msg-run-link" target="_blank" rel="noopener noreferrer">
@@ -466,13 +466,13 @@ export const ChatInterface: React.FC = () => {
 
                 {thinkingText && (
                   <div className="message msg-assistant thinking-msg">
-                    <div className="msg-role">🤖 GemmaQA</div>
+                    <div className="msg-role">🤖 QA Engine</div>
                     <div className="msg-content thinking-text">🤔 {thinkingText}</div>
                   </div>
                 )}
                 {streamingContent && (
                   <div className="message msg-assistant streaming-msg">
-                    <div className="msg-role">🤖 GemmaQA</div>
+                    <div className="msg-role">🤖 QA Engine</div>
                     <div className="msg-content">{streamingContent}<span className="cursor-blink">▋</span></div>
                   </div>
                 )}
@@ -515,7 +515,7 @@ export const ChatInterface: React.FC = () => {
             </>
           ) : (
             <div className="welcome-state">
-              <h2>👋 Welcome to GemmaQA Chat</h2>
+              <h2>👋 Welcome to QA Engine Chat</h2>
               <p>Test web apps using natural language. Configure your preferences first.</p>
               <div style={{ display: 'flex', gap: 12 }}>
                 <button className="btn-start" onClick={() => setShowSettings(s => !s)}>

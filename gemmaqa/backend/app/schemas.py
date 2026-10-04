@@ -939,7 +939,7 @@ class FinalReport(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str = "ok"
-    app: str = "GemmaQA"
+    app: str = "QA Engine"
     version: str = "0.1.0"
 
 

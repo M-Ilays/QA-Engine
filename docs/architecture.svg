@@ -1,56 +1,91 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="720" viewBox="0 0 1100 720" role="img" aria-label="GemmaQA architecture diagram">
-  <rect width="1100" height="720" fill="#0b1220"/>
-  <text x="550" y="42" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="700">GemmaQA Architecture</text>
-  <text x="550" y="68" text-anchor="middle" fill="#9db0d0" font-family="Segoe UI, Arial, sans-serif" font-size="14">AgentController executor | Playwright browser</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="860" viewBox="0 0 1100 860" role="img" aria-label="QA Engine architecture diagram">
+  <rect width="1100" height="860" fill="#0b1220"/>
+  <text x="550" y="42" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="700">QA Engine Architecture</text>
+  <text x="550" y="68" text-anchor="middle" fill="#9db0d0" font-family="Segoe UI, Arial, sans-serif" font-size="14">Chat or New Run starts AgentController. One safe browser action at a time.</text>
 
-  <rect x="80" y="100" width="940" height="90" rx="14" fill="#152238" stroke="#3b82f6" stroke-width="2"/>
-  <text x="550" y="138" text-anchor="middle" fill="#93c5fd" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700">USER / OPERATOR</text>
-  <text x="550" y="164" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700">React UI  |  New Run, live activity log, Pause / Resume / End</text>
+  <rect x="80" y="96" width="940" height="88" rx="14" fill="#152238" stroke="#3b82f6" stroke-width="2"/>
+  <text x="550" y="128" text-anchor="middle" fill="#93c5fd" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700">OPERATOR</text>
+  <text x="550" y="154" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700">React UI</text>
+  <text x="550" y="174" text-anchor="middle" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="12">Chat, New Run, live activity, bugs, test cases, reports, Pause / Continue / End</text>
 
-  <path d="M550 190 L550 230" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
-  <text x="570" y="218" fill="#94a3b8" font-family="Segoe UI, Arial, sans-serif" font-size="12">HTTP / WebSocket</text>
+  <path d="M550 184 L550 214" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="562" y="206" fill="#94a3b8" font-family="Segoe UI, Arial, sans-serif" font-size="12">HTTP and WebSocket</text>
 
-  <rect x="80" y="230" width="940" height="320" rx="16" fill="#101a2c" stroke="#334155" stroke-width="2"/>
-  <text x="110" y="258" fill="#94a3b8" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700">FASTAPI BACKEND</text>
+  <rect x="80" y="220" width="940" height="300" rx="16" fill="#101a2c" stroke="#334155" stroke-width="2"/>
+  <text x="110" y="248" fill="#94a3b8" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700">FASTAPI BACKEND</text>
 
-  <rect x="110" y="278" width="420" height="240" rx="12" fill="#1e3a5f" stroke="#60a5fa" stroke-width="2"/>
-  <text x="320" y="312" text-anchor="middle" fill="#93c5fd" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">RUN CONTROL</text>
-  <text x="320" y="336" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">FastAPI run API</text>
-  <text x="320" y="358" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">Start, pause, resume, end</text>
-  <text x="320" y="392" text-anchor="middle" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="12">Holds run configuration</text>
-  <text x="320" y="412" text-anchor="middle" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="12">Pause, resume, and end</text>
-  <text x="320" y="432" text-anchor="middle" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="12">Streams the activity log</text>
-  <text x="320" y="462" text-anchor="middle" fill="#93c5fd" font-family="Segoe UI, Arial, sans-serif" font-size="12">Does not drive the browser</text>
-  <text x="320" y="492" text-anchor="middle" fill="#64748b" font-family="Segoe UI, Arial, sans-serif" font-size="11">Live activity over WebSocket</text>
+  <rect x="110" y="268" width="250" height="220" rx="12" fill="#1e3a5f" stroke="#60a5fa" stroke-width="2"/>
+  <text x="235" y="304" text-anchor="middle" fill="#93c5fd" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">RUN AND CHAT API</text>
+  <text x="235" y="336" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">Start a run from chat</text>
+  <text x="235" y="358" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">or from New Run</text>
+  <text x="235" y="392" text-anchor="middle" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="12">Pause, continue, end</text>
+  <text x="235" y="414" text-anchor="middle" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="12">Scope and test-case type</text>
+  <text x="235" y="448" text-anchor="middle" fill="#64748b" font-family="Segoe UI, Arial, sans-serif" font-size="11">Does not drive the browser</text>
 
-  <path d="M530 398 L570 398" stroke="#60a5fa" stroke-width="2" marker-end="url(#arrow)"/>
-  <text x="550" y="386" text-anchor="middle" fill="#93c5fd" font-family="Segoe UI, Arial, sans-serif" font-size="11">start</text>
+  <path d="M360 378 L400 378" stroke="#60a5fa" stroke-width="2" marker-end="url(#arrowBlue)"/>
+  <text x="380" y="366" text-anchor="middle" fill="#93c5fd" font-family="Segoe UI, Arial, sans-serif" font-size="11">start</text>
 
-  <rect x="570" y="278" width="420" height="240" rx="12" fill="#14532d" stroke="#4ade80" stroke-width="2"/>
-  <text x="780" y="312" text-anchor="middle" fill="#86efac" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">AGENT CONTROLLER</text>
-  <text x="780" y="336" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">Observe - Classify - Plan</text>
-  <text x="780" y="358" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">Execute - Report</text>
-  <text x="780" y="392" text-anchor="middle" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="12">Optional page model:</text>
-  <text x="780" y="412" text-anchor="middle" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="12">Gemini | Ollama | Mock</text>
-  <text x="780" y="442" text-anchor="middle" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="12">Safety policy, evidence, reports</text>
-  <text x="780" y="492" text-anchor="middle" fill="#86efac" font-family="Segoe UI, Arial, sans-serif" font-size="12">Drives the real browser</text>
+  <rect x="400" y="268" width="300" height="220" rx="12" fill="#14532d" stroke="#4ade80" stroke-width="2"/>
+  <text x="550" y="304" text-anchor="middle" fill="#86efac" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">AGENT CONTROLLER</text>
+  <text x="550" y="334" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">Observe and classify the page</text>
+  <text x="550" y="356" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">Plan one safe action</text>
+  <text x="550" y="378" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">Execute, then check validation</text>
+  <text x="550" y="412" text-anchor="middle" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="12">Safety policy on every action</text>
+  <text x="550" y="434" text-anchor="middle" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="12">Writes the test cases and bugs</text>
+  <text x="550" y="464" text-anchor="middle" fill="#86efac" font-family="Segoe UI, Arial, sans-serif" font-size="12">Drives the real browser</text>
 
-  <path d="M780 550 L780 590" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M700 378 L740 378" stroke="#4ade80" stroke-width="2" marker-end="url(#arrowGreen)"/>
+  <text x="720" y="366" text-anchor="middle" fill="#86efac" font-family="Segoe UI, Arial, sans-serif" font-size="11">ask</text>
 
-  <rect x="80" y="590" width="440" height="90" rx="14" fill="#152238" stroke="#a78bfa" stroke-width="2"/>
-  <text x="300" y="628" text-anchor="middle" fill="#c4b5fd" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">PLAYWRIGHT | Chromium</text>
-  <text x="300" y="654" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">Click, type, navigate, screenshot</text>
+  <rect x="740" y="268" width="250" height="220" rx="12" fill="#3b2f14" stroke="#f59e0b" stroke-width="2"/>
+  <text x="865" y="304" text-anchor="middle" fill="#fcd34d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">OPTIONAL MODEL</text>
+  <text x="865" y="336" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">Google Gemini</text>
+  <text x="865" y="358" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">Ollama</text>
+  <text x="865" y="380" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">Transformers</text>
+  <text x="865" y="402" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">Mock</text>
+  <text x="865" y="436" text-anchor="middle" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="12">Page reasoning when selected</text>
+  <text x="865" y="464" text-anchor="middle" fill="#64748b" font-family="Segoe UI, Arial, sans-serif" font-size="11">Mock needs no live model</text>
 
-  <rect x="580" y="590" width="440" height="90" rx="14" fill="#152238" stroke="#f59e0b" stroke-width="2"/>
-  <text x="800" y="628" text-anchor="middle" fill="#fcd34d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">AUTHORIZED TARGET SITE</text>
-  <text x="800" y="654" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">Only systems you own or may test</text>
+  <path d="M550 520 L550 560" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="562" y="548" fill="#94a3b8" font-family="Segoe UI, Arial, sans-serif" font-size="12">Playwright</text>
 
-  <path d="M520 635 L580 635" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="80" y="568" width="300" height="110" rx="14" fill="#152238" stroke="#a78bfa" stroke-width="2"/>
+  <text x="230" y="608" text-anchor="middle" fill="#c4b5fd" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">PLAYWRIGHT</text>
+  <text x="230" y="634" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">Chromium</text>
+  <text x="230" y="656" text-anchor="middle" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="12">Click, type, submit, screenshot</text>
+
+  <path d="M380 623 L420 623" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="420" y="568" width="280" height="110" rx="14" fill="#152238" stroke="#f59e0b" stroke-width="2"/>
+  <text x="560" y="608" text-anchor="middle" fill="#fcd34d" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">AUTHORIZED SITE</text>
+  <text x="560" y="634" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">The application under test</text>
+  <text x="560" y="656" text-anchor="middle" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="12">Only systems you may test</text>
+
+  <rect x="740" y="568" width="280" height="110" rx="14" fill="#152238" stroke="#34d399" stroke-width="2"/>
+  <text x="880" y="608" text-anchor="middle" fill="#6ee7b7" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">EVIDENCE</text>
+  <text x="880" y="634" text-anchor="middle" fill="#e8eefc" font-family="Segoe UI, Arial, sans-serif" font-size="13">SQLite, screenshots, reports</text>
+  <text x="880" y="656" text-anchor="middle" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="12">Bugs and test cases stream live</text>
+
+  <path d="M880 568 L880 520" stroke="#34d399" stroke-width="2" marker-end="url(#arrowMint)"/>
+  <text x="892" y="548" fill="#6ee7b7" font-family="Segoe UI, Arial, sans-serif" font-size="11">save</text>
+
+  <text x="550" y="730" text-anchor="middle" fill="#94a3b8" font-family="Segoe UI, Arial, sans-serif" font-size="13">A missing validation message on a form that stays open is recorded as a bug.</text>
+  <text x="550" y="754" text-anchor="middle" fill="#94a3b8" font-family="Segoe UI, Arial, sans-serif" font-size="13">A submit that leaves the form is a successful step.</text>
+  <text x="550" y="800" text-anchor="middle" fill="#64748b" font-family="Segoe UI, Arial, sans-serif" font-size="12">SQLite keeps the run. The live log returns to the React UI over WebSocket.</text>
 
   <defs>
     <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
       <path d="M0,0 L8,4 L0,8 z" fill="#64748b"/>
+    </marker>
+    <marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#60a5fa"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#4ade80"/>
+    </marker>
+    <marker id="arrowMint" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#34d399"/>
     </marker>
   </defs>
 </svg>

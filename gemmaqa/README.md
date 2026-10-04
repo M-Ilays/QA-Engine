@@ -39,11 +39,13 @@ New Run starts **AgentController** + Playwright. Page-by-page reasoning uses the
 ## Architecture
 
 ```
-GemmaQA UI / API
-  → AgentController
-    → chosen model (Gemini, Ollama, Mock, …)
-    → Playwright (Direct)
-    → Target website
+QA Engine UI
+  → FastAPI (chat and runs)
+    → AgentController
+      → optional model (Gemini, Ollama, Transformers, Mock)
+      → Playwright Chromium
+      → authorized website
+    → SQLite, screenshots, reports
 ```
 
 | Layer | Stack |
