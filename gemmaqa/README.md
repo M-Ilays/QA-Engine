@@ -240,12 +240,11 @@ Full variable list: [`.env.example`](.env.example) and `backend/.env.example`.
 gemmaqa/
   backend/          FastAPI + AgentController + Playwright
   frontend/         React dashboard (New Run, live run, reports)
-  docs/             Engine and system documentation
   evidence/         Per-run screenshots, traces, reports (generated)
   tests/            Unit tests (mock provider; fixtures under tests/fixtures/)
 ```
 
-Further reading: [`docs/system/DOCUMENTATION_INDEX.md`](docs/system/DOCUMENTATION_INDEX.md), [`docs/system/GEMMAQA_ARCHITECTURE.md`](docs/system/GEMMAQA_ARCHITECTURE.md), [`docs/system/GEMMAQA_USER_GUIDE.md`](docs/system/GEMMAQA_USER_GUIDE.md).
+Further reading: [`../PRD.md`](../PRD.md), [`../ARCHITECTURE.md`](../ARCHITECTURE.md).
 
 ---
 

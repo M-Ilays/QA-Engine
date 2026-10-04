@@ -308,7 +308,6 @@ A live Cloud Run deploy needs a billed GCP project, Artifact Registry, and Secre
 │   ├── README.md              Same product README (nested copy)
 │   ├── backend/               FastAPI + AgentController + Playwright
 │   ├── frontend/              React dashboard (New Run, live run, reports)
-│   ├── docs/                  Engine and system documentation
 │   ├── evidence/              Per-run screenshots, traces, reports (generated, gitignored)
 │   ├── tests/                 Unit tests (mock provider; fixtures under tests/fixtures/)
 │   ├── start-dev.ps1          Local backend + frontend
@@ -316,7 +315,7 @@ A live Cloud Run deploy needs a billed GCP project, Artifact Registry, and Secre
 └── requirements-cloud.txt     Optional extra packages for Cloud Run tooling
 ```
 
-Further reading: [`gemmaqa/docs/system/DOCUMENTATION_INDEX.md`](gemmaqa/docs/system/DOCUMENTATION_INDEX.md), [`gemmaqa/docs/system/GEMMAQA_ARCHITECTURE.md`](gemmaqa/docs/system/GEMMAQA_ARCHITECTURE.md), [`gemmaqa/docs/system/GEMMAQA_USER_GUIDE.md`](gemmaqa/docs/system/GEMMAQA_USER_GUIDE.md).
+Further reading: [`PRD.md`](PRD.md), [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ---
 
