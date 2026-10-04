@@ -1,8 +1,8 @@
-# GemmaQA
+# QA Engine
 
 **Autonomous QA agent for QA and development teams — exploratory, regression, and retesting of authorized web applications.**
 
-GemmaQA opens a real browser, explores the target, fills and submits forms, exercises CRUD workflows, captures evidence, and writes a structured QA report. Use it for a first-pass exploration, a retest after a fix, or another pass after a change. It is not a saved scripted suite. Google Gemini is an optional Model-dropdown backend. The default browser adapter is **Direct Playwright**. The canonical demo target is the Thinking Tester Contact List:
+QA Engine opens a real browser, explores the target, fills and submits forms, exercises CRUD workflows, captures evidence, and writes a structured QA report. Use it for a first-pass exploration, a retest after a fix, or another pass after a change. It is not a saved scripted suite. Google Gemini is an optional Model-dropdown backend. The default browser adapter is **Direct Playwright**. The canonical demo target is the Thinking Tester Contact List:
 
 **https://thinking-tester-contact-list.herokuapp.com/**
 
@@ -29,7 +29,7 @@ New Run starts **AgentController** + Playwright. Page-by-page reasoning uses the
 - Autonomous exploration and intelligent planning
 - Direct Playwright (Chromium) execution
 - Form filling, submission, validation-error detection, and recovery
-- CRUD workflow testing (create / read / update / delete of *GemmaQA’s own* test records, when permitted)
+- CRUD workflow testing (create / read / update / delete of *QA Engine’s own* test records, when permitted)
 - Live activity log
 - Operator controls: Pause, Continue, End Run, Execution Speed, Action Pause
 - Safety checks: authorized domain, action classification, destructive-action permission
@@ -64,7 +64,7 @@ Google Gemini is an **optional** Model-dropdown backend (`pip install -r backend
 
 1. Confirm authorization in the UI (`authorization_ack`).
 2. Start a run against an allowed URL (default Contact List).
-3. Enable **test-data creation** for CRUD. Enable **deletion of GemmaQA’s own test records** if you want Delete Contact / cleanup.
+3. Enable **test-data creation** for CRUD. Enable **deletion of QA Engine’s own test records** if you want Delete Contact / cleanup.
 4. AgentController observes the page, plans one action, validates it against safety policy, and executes it with Playwright.
 5. Validation failures (for example an invalid phone number) are treated as application feedback: the agent can recover and continue rather than repeating the same rejected input.
 6. The run continues until you click **End Run**, a fatal error occurs, or an existing safety stop fires (for example no-progress / consecutive model failures). There is **no** action-count budget, **no** page-count budget, and **no** 15-minute runtime watchdog.
@@ -85,7 +85,7 @@ Available on the live run screen while the browser session is active:
 | **Action Pause** | Delay between actions (`0s`–`10s`) |
 | **Activity log** | Durable live log of what the agent is doing |
 
-Safety checks stay on. Destructive actions (including deleting GemmaQA-created records) require the matching New Run permission.
+Safety checks stay on. Destructive actions (including deleting QA Engine-created records) require the matching New Run permission.
 
 ---
 
@@ -93,12 +93,12 @@ Safety checks stay on. Destructive actions (including deleting GemmaQA-created r
 
 Canonical site: **https://thinking-tester-contact-list.herokuapp.com/**
 
-On that application, GemmaQA has autonomously demonstrated:
+On that application, QA Engine has autonomously demonstrated:
 
 - Signup
 - Add Contact
 - Edit Contact
-- Delete Contact (requires **Allow deletion of GemmaQA’s own test records**)
+- Delete Contact (requires **Allow deletion of QA Engine’s own test records**)
 - Form validation detection
 - Recovery after invalid phone-number input
 - Continued autonomous exploration after those flows
