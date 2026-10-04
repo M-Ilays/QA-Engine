@@ -7,7 +7,7 @@ _caches/
 .idea/
 .vscode/
 
-# Secrets and credentials (belt-and-suspenders; gemmaqa/.gitignore also covers these)
+# Secrets and credentials (belt-and-suspenders; the app .gitignore also covers these)
 .env
 .env.*
 !.env.example

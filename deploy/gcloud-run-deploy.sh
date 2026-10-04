@@ -1,13 +1,13 @@
 # Example Cloud Run deploy. Do not run until the operator approves.
 #
 # Prerequisites:
-#   gcloud config set project gemmaqa-hackathon
+#   gcloud config set project YOUR_GCP_PROJECT
 #   Secret Manager secret named gemini-api-key containing GEMINI_API_KEY
-#   Artifact Registry repo (example: us-central1-docker.pkg.dev/gemmaqa-hackathon/gemmaqa/gemmaqa)
+#   Artifact Registry repo (example: us-central1-docker.pkg.dev/YOUR_GCP_PROJECT/qa-engine/qa-engine)
 
-# IMAGE=us-central1-docker.pkg.dev/gemmaqa-hackathon/gemmaqa/gemmaqa:latest
-# gcloud run deploy gemmaqa \
-#   --project gemmaqa-hackathon \
+# IMAGE=us-central1-docker.pkg.dev/YOUR_GCP_PROJECT/qa-engine/qa-engine:latest
+# gcloud run deploy qa-engine \
+#   --project YOUR_GCP_PROJECT \
 #   --region us-central1 \
 #   --image "$IMAGE" \
 #   --min-instances 1 \

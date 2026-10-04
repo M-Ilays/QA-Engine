@@ -1,4 +1,4 @@
-# Build context: repository root (d:\GemmaQA)
+# QA Engine image build context: repository root.
 # Never send secrets or local runtime data to the daemon.
 
 .git

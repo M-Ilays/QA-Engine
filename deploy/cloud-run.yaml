@@ -1,5 +1,5 @@
-# Cloud Run service spec for GemmaQA (NOT deployed by this repo automatically).
-# Project: gemmaqa-hackathon  |  Region: us-central1  |  Service: gemmaqa
+# Cloud Run service spec for QA Engine (NOT deployed by this repo automatically).
+# Region: us-central1  |  Service: qa-engine
 #
 # SQLite and evidence/ live on the container filesystem and are ephemeral
 # across instance replacement. minScale=1 keeps one instance warm for the demo.
@@ -9,7 +9,7 @@
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: gemmaqa
+  name: qa-engine
   labels:
     cloud.googleapis.com/location: us-central1
   annotations:

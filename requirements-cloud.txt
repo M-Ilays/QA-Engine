@@ -1,4 +1,4 @@
-# Additional dependencies for Cloud Run deployment
+# Additional QA Engine dependencies for a Cloud Run image
 # Install alongside requirements.txt and requirements-gemini.txt
 #
 # Usage: pip install -r requirements.txt -r requirements-gemini.txt -r requirements-cloud.txt

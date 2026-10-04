@@ -1,6 +1,6 @@
-# GemmaQA production image for Google Cloud Run (one service: API + SPA + Playwright).
+# QA Engine production image for Google Cloud Run (one service: API + SPA + Playwright).
 # Build from the repository root:
-#   docker build -t gemmaqa:local .
+#   docker build -t qa-engine:local .
 # Do not copy secrets. Pass GEMINI_API_KEY at runtime (Cloud Run Secret Manager).
 
 # ---------------------------------------------------------------------------
