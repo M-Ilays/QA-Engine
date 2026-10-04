@@ -359,8 +359,6 @@ class RunMemory:
 
     def bootstrap_budgets(self, config: RunConfiguration) -> None:
         self.configuration = config
-        # max_actions / max_pages are no longer stop limits. Remaining-*
-        # fields stay as leftover context numbers and are not decremented.
 
     def remember_page(self, page: PageState, *, explored: bool = False) -> bool:
         """Record an observed page via the shared canonical upsert.

@@ -189,7 +189,13 @@ def test_full_lifecycle_fills_all_fields_then_submits_then_verifies():
 
     seen_elements = []
     action = wf.next_action()
-    while action is not None and action.action != ActionType.CLICK:
+    while action is not None and (
+        action.action != ActionType.CLICK or (action.metadata or {}).get("validation_probe")
+    ):
+        if (action.metadata or {}).get("validation_probe"):
+            assert action.action == ActionType.CLICK
+            action = wf.next_action()
+            continue
         seen_elements.append(action.element_id)
         assert action.action == ActionType.FILL
         assert action.value  # a real, non-empty positive value was planned
@@ -215,7 +221,9 @@ def test_workflow_does_not_submit_via_a_mis_detected_cancel_button():
     )
 
     action = wf.next_action()
-    while action is not None and action.action != ActionType.CLICK:
+    while action is not None and (
+        action.action != ActionType.CLICK or (action.metadata or {}).get("validation_probe")
+    ):
         action = wf.next_action()
     assert action is not None
     assert action.element_id == "el_continue"
@@ -285,11 +293,13 @@ def test_planner_starts_and_continues_workflow_through_full_dispatch():
 
     action1 = planner._select_auth_candidate(page, memory, context)
     assert action1 is not None
-    assert action1.action == ActionType.FILL
+    assert action1.action == ActionType.CLICK
+    assert (action1.metadata or {}).get("validation_probe") is True
     assert memory.active_form_workflow is not None
 
     action2 = planner._select_auth_candidate(page, memory, context)
     assert action2 is not None
+    assert action2.action == ActionType.FILL
     assert action2.element_id != action1.element_id
 
 

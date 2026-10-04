@@ -37,7 +37,6 @@ async def test_list_providers_includes_catalog_without_secrets(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ):
     monkeypatch.setenv("GEMINI_API_KEY", "secret-should-not-leak")
-    monkeypatch.setenv("AWS_BEARER_TOKEN_BEDROCK", "bedrock-secret-should-not-leak")
     monkeypatch.setenv("GEMMA_API_KEY", "gemma-secret-should-not-leak")
     get_settings.cache_clear()
 
@@ -51,7 +50,6 @@ async def test_list_providers_includes_catalog_without_secrets(
     assert body["applies_to"] == "new_runs"
     dumped = json.dumps(body)
     assert "secret-should-not-leak" not in dumped
-    assert "bedrock-secret-should-not-leak" not in dumped
     assert "gemma-secret-should-not-leak" not in dumped
     mock = next(item for item in body["providers"] if item["id"] == "mock")
     assert mock["configured"] is True

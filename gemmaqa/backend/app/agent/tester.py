@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 from app.agent.test_data import values_for_field
+from app.agent.test_scope import (
+    focus_terms,
+    page_matches_focus,
+    requested_types,
+)
 from app.application.store import form_fingerprint, scenario_key
 from app.application.url_normalize import normalize_url
 from app.gemma.base import GemmaProvider
@@ -43,11 +48,21 @@ class Tester:
         allow_controlled_writes: bool = False,
         app_store=None,
         skip_llm: bool = False,
+        focus_modules: list[str] | None = None,
+        test_case_types: list[str] | None = None,
+        testing_objective: str | None = None,
     ) -> list[TestScenario]:
         created: list[TestScenario] = []
         page_id = self._page_key(page_state, app_store)
+        types = requested_types(testing_objective, test_case_types)
+        focus = focus_terms(testing_objective, focus_modules)
 
-        for item in self._deterministic_specs(page_state):
+        for item in self._deterministic_specs(
+            page_state,
+            focus_modules=focus,
+            test_case_types=types,
+            testing_objective=testing_objective,
+        ):
             key = scenario_key(
                 page_id=page_id,
                 form_fingerprint=item.get("form_fp", ""),
@@ -69,6 +84,7 @@ class Tester:
                 priority=item.get("priority", "medium"),
                 steps=list(item.get("steps") or []),
                 expected_results=list(item.get("expected") or []),
+                test_case_type=item.get("test_case_type", "positive"),
             )
             created.append(sc)
             self.scenarios.append(sc)
@@ -163,6 +179,7 @@ class Tester:
                         preconditions=list(raw.get("preconditions") or []),
                         steps=list(raw.get("steps") or []),
                         expected_results=list(raw.get("expected_results") or []),
+                        test_case_type="positive" if "positive" in (types or ["positive"]) else "exploratory",
                     )
                     created.append(sc)
                     self.scenarios.append(sc)
@@ -200,9 +217,49 @@ class Tester:
         ftype = (getattr(field, "field_type", None) or "field").strip()
         return f"{ftype} field"
 
-    def _deterministic_specs(self, page_state: PageState) -> list[dict]:
-        """One scenario per page+form+field+category+data_class combination."""
+    def _form_label(self, page_state: PageState) -> str:
+        heading = (page_state.headings[0] if page_state.headings else "") or ""
+        title = (page_state.title or "").strip()
+        return heading.strip() or title or "form"
+
+    def _deterministic_specs(
+        self,
+        page_state: PageState,
+        *,
+        focus_modules: list[str] | None = None,
+        test_case_types: list[str] | None = None,
+        testing_objective: str | None = None,
+    ) -> list[dict]:
+        """Generate only the scenarios the operator asked for.
+
+        Focused runs (e.g. signup + positive) never emit page-title smoke
+        tests or empty-field negatives, and skip pages outside the feature.
+        """
         from urllib.parse import urlparse
+
+        types = list(test_case_types or [])
+        focus = list(focus_modules or [])
+        want_positive = not types or "positive" in types
+        want_negative = "negative" in types
+        want_exploratory = "exploratory" in types or not (focus or types)
+
+        if focus and not page_matches_focus(
+            url=page_state.url,
+            title=page_state.title,
+            headings=list(page_state.headings or []),
+            extra=" ".join(
+                self._field_display_name(f)
+                for form in page_state.forms
+                for f in form.fields
+            ),
+            focus=focus,
+        ):
+            logger.info(
+                "Skipping scenario generation on %s — outside focused scope %s",
+                page_state.url,
+                focus,
+            )
+            return []
 
         path = urlparse(page_state.url).path or "/"
         page_label = (page_state.title or "").strip() or path
@@ -210,87 +267,128 @@ class Tester:
             smoke_label = f"{page_label} ({path})"
         else:
             smoke_label = page_label
-        out: list[dict] = [
-            {
-                "title": f"Smoke: page title present on {smoke_label}",
-                "category": "smoke",
-                "data_class": "smoke",
-                "field_key": "page-title",
-                "steps": ["Open page", "Confirm title is non-empty"],
-                "expected": ["Title is displayed"],
-            }
-        ]
+        form_label = self._form_label(page_state)
+        out: list[dict] = []
+
+        # Smoke / page-title tests are not a requested feature test.
+        if want_exploratory and not focus and not types:
+            out.append(
+                {
+                    "title": f"Smoke: page title present on {smoke_label}",
+                    "description": f"Verify that {smoke_label} loads and the page title is visible.",
+                    "category": "smoke",
+                    "test_case_type": "positive",
+                    "data_class": "smoke",
+                    "field_key": "page-title",
+                    "steps": ["Open page", "Confirm title is non-empty"],
+                    "expected": ["Title is displayed"],
+                }
+            )
+
         for form in page_state.forms:
             fp = form_fingerprint(form)
             required = [f for f in form.fields if f.required]
-            if required:
-                req_names = ", ".join(self._field_display_name(f) for f in required[:4])
+            field_names = ", ".join(
+                self._field_display_name(f) for f in (required or form.fields)[:6]
+            ) or "required fields"
+
+            if want_positive:
                 out.append(
                     {
-                        "title": f"Required field validation ({req_names})",
-                        "category": "negative",
-                        "form_fp": fp,
-                        "field_key": "required-group",
-                        "data_class": "empty",
-                        "steps": [
-                            "Locate form",
-                            "Leave required fields empty",
-                            "Attempt submit",
-                        ],
-                        "expected": ["Validation prevents submission or shows errors"],
-                    }
-                )
-            for field in form.fields:
-                display = self._field_display_name(field)
-                fkey = (field.name or field.label or field.element_id or display).lower()
-                # Exactly one representative value class per field (prefer empty for required)
-                values = values_for_field(field.field_type, field.label)
-                chosen = None
-                if field.required:
-                    chosen = next((v for v in values if v.category == "empty"), None)
-                if chosen is None and values:
-                    # Prefer empty, else first deterministic value
-                    chosen = next((v for v in values if v.category == "empty"), values[0])
-                if chosen is None:
-                    continue
-                out.append(
-                    {
-                        "title": f"{chosen.description} on {display}",
-                        "category": (
-                            "boundary"
-                            if "boundary" in chosen.category or "long" in chosen.category
-                            else "form"
+                        "title": f"Submit {form_label} with valid data",
+                        "description": (
+                            f"Verify that {form_label} accepts valid values for "
+                            f"{field_names} and completes successfully."
                         ),
+                        "category": "form",
+                        "test_case_type": "positive",
                         "form_fp": fp,
-                        "field_key": fkey,
-                        "data_class": chosen.category,
+                        "field_key": "valid-submit",
+                        "data_class": "valid",
                         "steps": [
-                            f"Fill field with {chosen.category} value",
-                            "Observe validation",
+                            f"Open {form_label}",
+                            f"Enter valid values for {field_names}",
+                            "Submit the form",
+                            "Confirm the success outcome (redirect, confirmation, or new session)",
                         ],
-                        "expected": ["Application handles input safely"],
+                        "expected": [
+                            "The form accepts valid data and the application shows the expected success state."
+                        ],
                     }
                 )
-        if page_state.search_fields:
-            out.append(
-                {
-                    "title": "Search with no results",
-                    "category": "exploratory",
-                    "data_class": "search-empty",
-                    "field_key": "search",
-                    "steps": ["Enter nonsense query QA_TEST_NO_RESULTS_ZZZ", "Submit search"],
-                    "expected": ["Empty state shown without crash"],
-                }
-            )
-        if page_state.pagination_controls:
-            out.append(
-                {
-                    "title": "Pagination edge case",
-                    "category": "exploratory",
-                    "data_class": "pagination",
-                    "field_key": "pagination",
-                    "steps": ["Navigate pagination controls", "Observe list stability"],
-                    "expected": ["Page changes without console/network 500s"],
-                }
-            )
+
+            if want_negative:
+                if required:
+                    out.append(
+                        {
+                            "title": f"Required field validation on {form_label}",
+                            "description": (
+                                f"Verify that {form_label} blocks submit when "
+                                f"{field_names} are left empty."
+                            ),
+                            "category": "negative",
+                            "test_case_type": "negative",
+                            "form_fp": fp,
+                            "field_key": "required-group",
+                            "data_class": "empty",
+                            "steps": [
+                                f"Open {form_label}",
+                                "Leave required fields empty",
+                                "Attempt submit",
+                            ],
+                            "expected": ["Validation prevents submission or shows errors"],
+                        }
+                    )
+                for field in form.fields:
+                    display = self._field_display_name(field)
+                    fkey = (field.name or field.label or field.element_id or display).lower()
+                    values = values_for_field(field.field_type, field.label)
+                    chosen = next((v for v in values if v.category == "empty"), None)
+                    if chosen is None:
+                        continue
+                    out.append(
+                        {
+                            "title": f"{chosen.description} on {display}",
+                            "description": (
+                                f"Verify that {form_label} rejects an empty {display} value."
+                            ),
+                            "category": "form",
+                            "test_case_type": "negative",
+                            "form_fp": fp,
+                            "field_key": fkey,
+                            "data_class": chosen.category,
+                            "steps": [
+                                f"Leave {display} empty",
+                                "Attempt submit",
+                                "Observe validation",
+                            ],
+                            "expected": ["Application shows a validation error and does not succeed"],
+                        }
+                    )
+
+        if want_exploratory and not focus:
+            if page_state.search_fields:
+                out.append(
+                    {
+                        "title": "Search with no results",
+                        "category": "exploratory",
+                        "test_case_type": "exploratory",
+                        "data_class": "search-empty",
+                        "field_key": "search",
+                        "steps": ["Enter nonsense query QA_TEST_NO_RESULTS_ZZZ", "Submit search"],
+                        "expected": ["Empty state shown without crash"],
+                    }
+                )
+            if page_state.pagination_controls:
+                out.append(
+                    {
+                        "title": "Pagination edge case",
+                        "category": "exploratory",
+                        "test_case_type": "exploratory",
+                        "data_class": "pagination",
+                        "field_key": "pagination",
+                        "steps": ["Navigate pagination controls", "Observe list stability"],
+                        "expected": ["Page changes without console/network 500s"],
+                    }
+                )
         return out

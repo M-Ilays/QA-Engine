@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import ai, health, reports, runs, websocket
+from app.routers import chat
 from app.api.errors import register_exception_handlers
 from app.config import get_settings
 from app.frontend_static import frontend_dist_dir, mount_frontend
@@ -78,6 +79,7 @@ app.include_router(runs.router)
 app.include_router(reports.router)
 app.include_router(websocket.router)
 app.include_router(ai.router)
+app.include_router(chat.router)
 app.include_router(health.router)
 
 

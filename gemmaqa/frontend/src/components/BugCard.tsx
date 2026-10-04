@@ -12,7 +12,7 @@ export function BugCard({
   runId: string;
   compact?: boolean;
 }) {
-  const inferred = bug.classification === "suspected_bug" || bug.confidence < 0.8;
+  const inferred = bug.classification !== "confirmed_bug";
 
   return (
     <Link

@@ -20,11 +20,6 @@ def provider_display_name(provider_type: str | None = None) -> str:
         return "Gemma via OpenAI-compatible API"
     if name == "transformers":
         return "Gemma via Transformers"
-    if name == "bedrock":
-        # Not "Gemma via Bedrock": the configured BEDROCK_MODEL_ID is frequently
-        # not a Gemma model at all (Claude, Nova, Llama), and a display name that
-        # asserts otherwise would misreport every run.
-        return "Amazon Bedrock"
     if name == "gemini":
         return "Google Gemini"
     return f"Gemma ({name})"
@@ -34,11 +29,6 @@ def run_mode_label(provider_type: str | None = None) -> str:
     name = (provider_type or get_settings().normalized_gemma_provider).lower()
     if name == "mock":
         return "Mock / deterministic"
-    if name == "bedrock":
-        # Bedrock is a managed cloud service — prompts leave the machine. Calling
-        # that "Local AI" would tell an operator the opposite of the truth about
-        # where the page content they are testing actually goes.
-        return "Cloud AI (Amazon Bedrock)"
     if name == "gemini":
         return "Cloud AI (Google Gemini)"
     return "Local AI"
@@ -116,18 +106,12 @@ def reported_model_id(provider_type: str | None = None) -> str:
     provider = (provider_type or settings.normalized_gemma_provider).lower()
     if provider == "mock":
         return ""
-    # Bedrock keeps its own setting and deliberately never falls back to
-    # GEMMA_MODEL_ID — see config.effective_bedrock_model_id for why.
-    configured = (
-        settings.effective_bedrock_model_id
-        if provider == "bedrock"
-        else settings.effective_gemma_model_id
-    )
+    configured = settings.effective_gemma_model_id
     health = get_active_health()
     # The health record reflects what the provider actually resolved, so it wins —
     # but ONLY when it describes this provider. `_ACTIVE_HEALTH` is process-wide
     # and set by whichever provider was constructed last, so an unmatched record
-    # is stale and reported "mock-heuristic" for a Bedrock run before this check.
+    # is stale.
     if health and health.model_id and health.provider_type == provider:
         return health.model_id
     return configured

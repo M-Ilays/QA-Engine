@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime
 from typing import Any
@@ -88,6 +89,225 @@ _BEARER = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9\-._~+/]+=*")
 _COOKIE_PAIR = re.compile(r"(?i)\b(sessionid|auth|jwt|access_token)=([^\s;]+)")
 
 
+_NEGATIVE_KEYWORDS = frozenset({
+    "invalid", "empty", "missing", "blank", "wrong", "incorrect",
+    "error", "fail", "reject", "boundary", "exceed", "too long",
+    "special char", "sql", "xss", "injection", "negative", "bad",
+    "unauthorized", "forbidden", "duplicate", "already exists",
+})
+
+_POSITIVE_KEYWORDS = frozenset({
+    "valid", "correct", "success", "happy", "positive", "smoke",
+    "confirm", "verify", "submit", "create", "login", "register",
+})
+
+# Ordered list: (keywords, MODULE_LABEL)
+_MODULE_KEYWORDS: list[tuple[list[str], str]] = [
+    (["signup", "sign up", "register", "registration", "create account"], "SIGNUP"),
+    (["login", "sign in", "signin", "log in", "authenticate"], "LOGIN"),
+    (["logout", "log out", "signout", "sign out"], "LOGOUT"),
+    (["contact", "contacts"], "CONTACT"),
+    (["search", "find", "filter", "query"], "SEARCH"),
+    (["add", "create", "new record", "insert"], "CREATE"),
+    (["edit", "update", "modify", "change"], "UPDATE"),
+    (["delete", "remove", "trash"], "DELETE"),
+    (["nav", "navigate", "navigation", "menu"], "NAV"),
+    (["page", "title", "smoke", "sanity"], "SMOKE"),
+    (["form"], "FORM"),
+    (["profile", "account", "settings"], "PROFILE"),
+    (["dashboard", "home"], "DASHBOARD"),
+]
+
+# Generic description patterns → better descriptions
+_DESCRIPTION_REWRITES: list[tuple[str, str]] = [
+    ("empty value on submit", "Verify that the form prevents submission when required fields are left empty."),
+    ("smoke: page title present", "Verify that the page loads correctly and the page title is visible."),
+    ("smoke:", "Verify that the page or feature loads and renders without errors."),
+    ("empty value", "Verify that the form shows validation errors when a required field is left empty."),
+    ("valid value on submit", "Verify that the form submits successfully when all required fields contain valid data."),
+    ("boundary test", "Verify that the form handles boundary / edge-case input values correctly."),
+    ("negative test", "Verify that the application correctly rejects invalid input and shows an appropriate error message."),
+]
+
+
+def _rewrite_description(original: str) -> str:
+    """Improve known generic AI-generated descriptions to be more meaningful."""
+    if not original:
+        return original
+    low = original.lower().strip()
+    for pattern, replacement in _DESCRIPTION_REWRITES:
+        if pattern in low:
+            return replacement
+    return original
+
+
+def _extract_module_label(title: str, category: str) -> str:
+    """Extract TC module label (e.g. SIGNUP) from scenario title + category."""
+    text = (title + " " + category).lower()
+    for keywords, label in _MODULE_KEYWORDS:
+        if any(kw in text for kw in keywords):
+            return label
+    return "TEST"
+
+
+def _infer_test_case_type(scenario) -> str:
+    """Infer positive / negative / exploratory from scenario title + description + category."""
+    text = " ".join([
+        str(getattr(scenario, "title", "") or ""),
+        str(getattr(scenario, "description", "") or ""),
+        str(getattr(scenario, "category", "") or ""),
+    ]).lower()
+
+    neg_hits = sum(1 for kw in _NEGATIVE_KEYWORDS if kw in text)
+    pos_hits = sum(1 for kw in _POSITIVE_KEYWORDS if kw in text)
+
+    if neg_hits > pos_hits:
+        return "negative"
+    if pos_hits > 0:
+        return "positive"
+    if "smoke" in text or "sanity" in text:
+        return "positive"
+    return "exploratory"
+
+
+def _collect_fill_data(memory: "RunMemory") -> dict[str, str]:
+    """Extract FILL action field:value pairs as a structured dict.
+    Skips bare element IDs (el_001, field_2) and empty values.
+    Returns dict like {"Email": "user@test.com", "Password": "••••••••"}
+    """
+    fill_dict: dict[str, str] = {}
+    for action_result in getattr(memory, "actions", []):
+        action = getattr(action_result, "action", None)
+        if action is None:
+            continue
+        action_type = getattr(action, "action", None)
+        if str(action_type) not in ("fill", "ActionType.FILL"):
+            continue
+        meta = getattr(action, "metadata", None) or {}
+        label = meta.get("label") or meta.get("field") or ""
+        value = meta.get("value") or meta.get("fill_value") or ""
+
+        # Skip entries with no actual value
+        if not value:
+            continue
+        # Skip raw element-ID labels like el_001, field_2, input_3, btn_4
+        if not label or re.match(r"^(el_|field_|input_|btn_)\d+$", str(label).strip().lower()):
+            continue
+
+        is_password_field = any(
+            w in str(label).lower() for w in ("password", "pass", "secret", "token")
+        )
+        display_value = "••••••••" if is_password_field else str(value)
+        if label not in fill_dict:
+            fill_dict[label] = display_value
+    return fill_dict
+
+
+def _enrich_scenarios_from_actions(
+    scenarios: list,
+    memory: "RunMemory",
+) -> list:
+    """Enrich every TestScenario with QA report fields.
+
+    Rules:
+    - execution_status is ONLY set to "Executed" when there is an explicit
+      TestExecution record for this scenario. Browser action pass-rate is NOT
+      used to infer execution — that would violate the assertion-vs-execution
+      distinction the QA spec requires.
+    - result is "Pass" when the TestExecution status is "passed", "Fail" when
+      "failed" or "blocked", and "N/A" when not executed.
+    - test_data is only populated for executed scenarios.
+    """
+    from app.schemas import TestScenario
+
+    if not scenarios:
+        return scenarios
+
+    # Build execution lookup: test_id → normalised status
+    exec_status: dict[str, str] = {}
+    for ex in getattr(memory, "executions", []):
+        raw = getattr(ex, "status", "not_run")
+        if raw == "passed":
+            exec_status[ex.test_id] = "passed"
+        elif raw in ("failed", "blocked"):
+            exec_status[ex.test_id] = "failed"
+        # not_run / skipped → omit (treat as not executed)
+
+    # Collect fill data dict from all agent actions
+    fill_dict = _collect_fill_data(memory)
+    fill_list = [f"{k}: {v}" for k, v in fill_dict.items()]
+    fill_formatted = "\n".join(fill_list)
+
+    # Track module counters per label for TC IDs
+    module_counters: dict[str, int] = {}
+
+    enriched = []
+    for s in scenarios:
+        if not isinstance(s, TestScenario):
+            enriched.append(s)
+            continue
+
+        # Generate friendly TC ID (TC_SIGNUP_POS_001 / TC_SIGNUP_NEG_001)
+        tc_type = getattr(s, "test_case_type", None) or _infer_test_case_type(s)
+        module = _extract_module_label(s.title, s.category)
+        type_marker = "NEG" if tc_type == "negative" else "POS"
+        counter_key = f"{module}_{type_marker}"
+        module_counters[counter_key] = module_counters.get(counter_key, 0) + 1
+        friendly_id = f"TC_{module}_{type_marker}_{module_counters[counter_key]:03d}"
+
+        # Improve description quality
+        description = _rewrite_description(s.description) or _rewrite_description(s.title) or s.title
+
+        # Determine execution status — ONLY from explicit TestExecution records
+        scenario_status = exec_status.get(s.test_id)  # "passed" | "failed" | None
+
+        if scenario_status == "passed":
+            execution_status_val = "Executed"
+            result_val = "Pass"
+            actual = "The application responded as expected — test passed."
+            internal_status = "passed"
+        elif scenario_status == "failed":
+            execution_status_val = "Executed"
+            result_val = "Fail"
+            actual = "The application did not respond as expected — test failed."
+            internal_status = "failed"
+        else:
+            # No TestExecution record → definitely not executed
+            execution_status_val = "Not Executed"
+            result_val = "N/A"
+            actual = ""
+            internal_status = "not_tested"
+
+        # Test data: only for executed scenarios; use real fill values only
+        if execution_status_val == "Executed" and fill_dict:
+            scenario_test_data = fill_list
+            scenario_test_data_json = fill_dict
+            scenario_test_data_fmt = fill_formatted
+        else:
+            scenario_test_data = []
+            scenario_test_data_json = {}
+            scenario_test_data_fmt = ""
+
+        enriched.append(
+            s.model_copy(
+                update={
+                    "friendly_id": friendly_id,
+                    "description": description,
+                    "test_data": scenario_test_data,
+                    "test_data_json": scenario_test_data_json,
+                    "test_data_formatted": scenario_test_data_fmt,
+                    "status": internal_status,
+                    "execution_status": execution_status_val,
+                    "result": result_val,
+                    "actual_result": actual,
+                    "test_case_type": tc_type,
+                }
+            )
+        )
+
+    return enriched
+
+
 def redact_value(value: Any) -> Any:
     """Redact secrets from scalar/list/dict values used in reports."""
     if isinstance(value, dict):
@@ -110,6 +330,118 @@ def redact_value(value: Any) -> Any:
                     return f"{parts[0][:2]}{MASK}@{parts[1]}"
         return text
     return value
+
+
+def _classification_label(bug: Defect) -> str:
+    raw = bug.classification or (bug.tags[0] if bug.tags else "")
+    return str(raw or "confirmed_bug")
+
+
+def _bucket_suspected(bug: Defect) -> bool:
+    """Suspected and observation findings stay visible, in the suspected list."""
+    text = _classification_label(bug).lower()
+    if "confirmed" in text:
+        return False
+    if bug.severity.value in {"critical", "blocker"}:
+        return False
+    return "suspected" in text or "observation" in text
+
+
+def _payload_classification(payload: dict[str, Any]) -> str:
+    tags = payload.get("tags") if isinstance(payload.get("tags"), list) else []
+    raw = payload.get("classification") or (tags[0] if tags else "")
+    return str(raw or "confirmed_bug")
+
+
+def _payload_is_suspected(classification: str, severity: str) -> bool:
+    text = classification.lower()
+    if "confirmed" in text:
+        return False
+    if str(severity or "").lower() in {"critical", "blocker"}:
+        return False
+    return "suspected" in text or "observation" in text
+
+
+def entry_from_stored_payload(
+    payload: dict[str, Any],
+    *,
+    bug_id: str,
+    run_id: str,
+    title: str,
+    severity: str,
+) -> dict[str, Any]:
+    """Map a persisted Defect payload onto a bug-report row."""
+    tags = payload.get("tags") if isinstance(payload.get("tags"), list) else []
+    classification = _payload_classification(payload)
+    module = str(payload.get("module") or (tags[1] if len(tags) > 1 else "") or "")
+    steps = payload.get("steps_to_reproduce") or payload.get("steps") or []
+    sev = str(payload.get("severity") or severity or "major")
+    return {
+        "bug_id": str(payload.get("bug_id") or bug_id),
+        "title": str(payload.get("title") or title or "Untitled defect"),
+        "module": module,
+        "page": str(payload.get("page_title") or payload.get("page") or ""),
+        "url": sanitize_url(str(payload.get("page_url") or payload.get("url") or "")),
+        "classification": classification,
+        "severity": sev,
+        "priority": str(payload.get("priority") or "medium"),
+        "preconditions": list(payload.get("preconditions") or []),
+        "test_data": str(redact_value(payload.get("test_data") or "")),
+        "steps_to_reproduce": [str(step) for step in steps] if isinstance(steps, list) else [],
+        "expected_result": str(payload.get("expected") or payload.get("expected_result") or ""),
+        "actual_result": str(redact_value(payload.get("actual") or payload.get("actual_result") or "")),
+        "business_impact": str(payload.get("business_impact") or ""),
+        "possible_root_cause_hypothesis": str(
+            payload.get("possible_root_cause") or payload.get("possible_root_cause_hypothesis") or ""
+        ),
+        "confidence": float(payload.get("confidence") or 0.0),
+        "screenshot_evidence": list(payload.get("screenshot_evidence") or []),
+        "trace_evidence": list(payload.get("trace_evidence") or []),
+        "console_evidence": list(payload.get("console_evidence") or []),
+        "network_evidence": list(payload.get("network_evidence") or []),
+        "discovery_timestamp": payload.get("created_at") or payload.get("discovery_timestamp"),
+        "run_id": str(payload.get("run_id") or run_id),
+    }
+
+
+def merge_persisted_bugs(report: dict[str, Any], records: list[Any]) -> dict[str, Any]:
+    """Add every stored bug the in-memory report dropped.
+
+    The live report dedupes by title and page, and it used to omit observation
+    findings. The database keeps each record. The Bugs tab, final report, and
+    CSV should list all of them.
+    """
+    confirmed = [dict(item) for item in (report.get("confirmed_bugs") or [])]
+    suspected = [dict(item) for item in (report.get("suspected_bugs") or [])]
+    seen = {str(item.get("bug_id")) for item in confirmed + suspected if item.get("bug_id")}
+    for record in records:
+        raw = getattr(record, "payload_json", None) or "{}"
+        try:
+            payload = json.loads(raw) if isinstance(raw, str) else dict(raw or {})
+        except json.JSONDecodeError:
+            payload = {}
+        entry = entry_from_stored_payload(
+            payload,
+            bug_id=str(getattr(record, "id", "") or payload.get("bug_id") or ""),
+            run_id=str(getattr(record, "run_id", "") or report.get("run_id") or ""),
+            title=str(getattr(record, "title", "") or ""),
+            severity=str(getattr(record, "severity", "") or ""),
+        )
+        if not entry["bug_id"] or not entry["title"] or entry["bug_id"] in seen:
+            continue
+        seen.add(entry["bug_id"])
+        if _payload_is_suspected(entry["classification"], entry["severity"]):
+            suspected.append(entry)
+        else:
+            confirmed.append(entry)
+    report["confirmed_bugs"] = confirmed
+    report["suspected_bugs"] = suspected
+    coverage = report.get("coverage")
+    if isinstance(coverage, dict):
+        coverage["bugs_found"] = len(confirmed) + len(suspected)
+        coverage["suspected_issues"] = max(int(coverage.get("suspected_issues") or 0), len(suspected))
+        report["coverage"] = coverage
+    return report
 
 
 class ReportBuilder:
@@ -254,6 +586,32 @@ class ReportBuilder:
                     expected_results=list(s.expected_results),
                 )
                 for s in app.scenarios
+            ]
+
+        # ── Enrich scenarios with test_data + status from actual actions ──────
+        scenarios = _enrich_scenarios_from_actions(scenarios, memory)
+
+        # Drop smoke / off-scope / wrong-type cases when the operator asked
+        # for a specific feature or test-case type (e.g. signup + positive).
+        from app.agent.test_scope import case_matches_request
+
+        cfg = getattr(memory, "configuration", None)
+        objective = getattr(memory, "testing_objective", None)
+        focus = list(getattr(cfg, "focus_modules", None) or [])
+        types = list(getattr(cfg, "test_case_types", None) or [])
+        if objective or focus or types:
+            scenarios = [
+                s
+                for s in scenarios
+                if case_matches_request(
+                    title=getattr(s, "title", ""),
+                    description=getattr(s, "description", ""),
+                    category=getattr(s, "category", ""),
+                    test_case_type=getattr(s, "test_case_type", ""),
+                    objective=objective,
+                    focus_modules=focus,
+                    test_case_types=types,
+                )
             ]
 
         investigation_stop_report = (
@@ -1569,27 +1927,26 @@ class ReportBuilder:
     def _confirmed_bug_entries(self, memory: RunMemory) -> list[BugReportEntry]:
         entries: list[BugReportEntry] = []
         for bug in memory.bugs:
-            classification = (bug.classification or bug.tags[0] if bug.tags else "confirmed_bug")
-            if "suspected" in str(classification) or "observation" in str(classification):
-                # Only treat as confirmed when tagged/classified as such or high severity signals
-                if "confirmed" not in str(classification) and bug.severity.value not in {
-                    "critical",
-                    "blocker",
-                }:
-                    continue
-            entries.append(self._defect_to_entry(bug, memory, classification="confirmed_bug"))
-        # Also from analyses explicitly confirmed
+            if _bucket_suspected(bug):
+                continue
+            entries.append(
+                self._defect_to_entry(bug, memory, classification=_classification_label(bug))
+            )
         for analysis in memory.suspected_bugs:
             if analysis.classification == BugClassification.CONFIRMED_BUG:
                 entries.append(self._analysis_to_entry(analysis, memory))
         return self._dedupe_entries(entries)
 
     def _suspected_bug_entries(self, memory: RunMemory) -> list[BugReportEntry]:
-        entries = [self._analysis_to_entry(a, memory) for a in memory.suspected_bugs]
+        entries: list[BugReportEntry] = []
         for bug in memory.bugs:
-            tags = " ".join(bug.tags or [])
-            if "suspected" in tags or (bug.classification or "") == "suspected_bug":
-                entries.append(self._defect_to_entry(bug, memory, classification="suspected_bug"))
+            if _bucket_suspected(bug):
+                entries.append(
+                    self._defect_to_entry(bug, memory, classification=_classification_label(bug))
+                )
+        for analysis in memory.suspected_bugs:
+            if analysis.classification != BugClassification.CONFIRMED_BUG:
+                entries.append(self._analysis_to_entry(analysis, memory))
         return self._dedupe_entries(entries)
 
     def _defect_to_entry(
@@ -1690,13 +2047,23 @@ class ReportBuilder:
         return shots, traces, console, network
 
     def _dedupe_entries(self, entries: list[BugReportEntry]) -> list[BugReportEntry]:
-        seen: set[tuple[str, str]] = set()
+        """Keep every distinct bug record.
+
+        Findings that share a title and page are still separate bugs when they
+        have different ids. Only synthesized analysis rows collapse into a
+        stored defect of the same title and URL.
+        """
+        seen_ids: set[str] = set()
+        seen_titles: set[tuple[str, str]] = set()
         out: list[BugReportEntry] = []
         for e in entries:
-            key = (e.title, e.url)
-            if key in seen or not e.title:
+            if not e.title or e.bug_id in seen_ids:
                 continue
-            seen.add(key)
+            title_key = (e.title, e.url)
+            if str(e.bug_id).startswith("analysis-") and title_key in seen_titles:
+                continue
+            seen_ids.add(e.bug_id)
+            seen_titles.add(title_key)
             out.append(e)
         return out
 

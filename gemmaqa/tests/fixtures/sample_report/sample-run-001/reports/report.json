@@ -1,6 +1,6 @@
 {
   "run_id": "sample-run-001",
-  "generated_at": "2026-08-31T12:14:33.284051",
+  "generated_at": "2026-10-04T12:53:18.501292",
   "target_url": "https://demo.gemmaqa.local/",
   "testing_objective": null,
   "executive_summary": "Exploratory QA of **Demo** at `https://demo.gemmaqa.local/` visited 3 unique page(s), explored 3, executed 1 action(s), generated 2 scenario(s), and recorded 1 confirmed bug(s) and 1 suspected issue(s). Observed exploratory coverage 100.0% (not complete application coverage). Stop reason: action_budget_sample.",
@@ -21,43 +21,43 @@
   "application_purpose": "A web application with user registration and/or login flows.",
   "modules": [
     {
-      "module_id": "ca7356f0-8990-4822-bd38-1265c259ea72",
+      "module_id": "76059420-b944-4516-8f94-2cab56a02fe3",
       "name": "Authentication",
       "description": "Authentication area of the application",
       "entry_urls": [
         "https://demo.gemmaqa.local/login"
       ],
       "page_ids": [
-        "5bbf8dc3-c753-46f7-909e-73790ca78e83"
+        "bd11abdd-69b4-465c-89fe-0d506e3b832a"
       ]
     },
     {
-      "module_id": "bb9e2401-40d5-419c-b2df-c99122b438d8",
+      "module_id": "26cadc42-5189-4192-a199-84ddde735276",
       "name": "Dashboard",
       "description": "Dashboard area of the application",
       "entry_urls": [
         "https://demo.gemmaqa.local/dashboard"
       ],
       "page_ids": [
-        "0eadf379-a718-415b-9cf5-2771bb84f962"
+        "6a7d5260-59ff-4ce4-847d-0e14b61280f4"
       ]
     },
     {
-      "module_id": "9588c35e-5861-4110-9b12-54c848c1de22",
+      "module_id": "fca4cf36-1c3c-49d6-a3ba-34b1c0981012",
       "name": "Inventory",
       "description": "Inventory area of the application",
       "entry_urls": [
         "https://demo.gemmaqa.local/inventory"
       ],
       "page_ids": [
-        "845c3c43-777c-4a21-ba19-36ae5a2bb8f9"
+        "fb1ef589-4bbc-4bcb-8ff2-676147fb3b46"
       ]
     }
   ],
   "navigation_structure": "flowchart TD\n  P0[\"Login\"]\n  P1[\"Dashboard\"]\n  P2[\"Inventory GemmaQA Demo\"]\n  P0 -->|submit| P1\n  P1 -->|click| P2",
   "page_inventory": [
     {
-      "page_id": "5bbf8dc3-c753-46f7-909e-73790ca78e83",
+      "page_id": "bd11abdd-69b4-465c-89fe-0d506e3b832a",
       "title": "Login",
       "url": "https://demo.gemmaqa.local/login",
       "normalized_path": "/login",
@@ -65,11 +65,11 @@
       "heading": "",
       "visit_count": 1,
       "exploration_status": "explored",
-      "module_id": "ca7356f0-8990-4822-bd38-1265c259ea72",
+      "module_id": "76059420-b944-4516-8f94-2cab56a02fe3",
       "fingerprint": "fp-login"
     },
     {
-      "page_id": "0eadf379-a718-415b-9cf5-2771bb84f962",
+      "page_id": "6a7d5260-59ff-4ce4-847d-0e14b61280f4",
       "title": "Dashboard",
       "url": "https://demo.gemmaqa.local/dashboard",
       "normalized_path": "/dashboard",
@@ -77,11 +77,11 @@
       "heading": "",
       "visit_count": 1,
       "exploration_status": "explored",
-      "module_id": "bb9e2401-40d5-419c-b2df-c99122b438d8",
+      "module_id": "26cadc42-5189-4192-a199-84ddde735276",
       "fingerprint": "fp-dash"
     },
     {
-      "page_id": "845c3c43-777c-4a21-ba19-36ae5a2bb8f9",
+      "page_id": "fb1ef589-4bbc-4bcb-8ff2-676147fb3b46",
       "title": "Inventory | GemmaQA Demo",
       "url": "https://demo.gemmaqa.local/inventory",
       "normalized_path": "/inventory",
@@ -89,13 +89,13 @@
       "heading": "",
       "visit_count": 1,
       "exploration_status": "explored",
-      "module_id": "9588c35e-5861-4110-9b12-54c848c1de22",
+      "module_id": "fca4cf36-1c3c-49d6-a3ba-34b1c0981012",
       "fingerprint": "fp-inv"
     }
   ],
   "forms_inventory": [
     {
-      "form_id": "56f308a0-f896-4ab0-88d2-d865f5a55887",
+      "form_id": "ba95aee3-6861-4564-8387-47c7aaaf9423",
       "page_url": "https://demo.gemmaqa.local/login",
       "method": "POST",
       "action": "/api/login",
@@ -120,7 +120,7 @@
       ]
     },
     {
-      "form_id": "94b25886-2c2d-45c4-af8b-362421d583db",
+      "form_id": "313660e8-4f3a-4ea4-aae5-00308b1c88e7",
       "page_url": "https://demo.gemmaqa.local/inventory",
       "method": "GET",
       "action": "",
@@ -223,10 +223,12 @@
     {
       "test_id": "tc-001",
       "title": "Login with valid credentials",
-      "description": "",
+      "description": "Login with valid credentials",
       "category": "smoke",
       "priority": "medium",
       "preconditions": [],
+      "test_data": [],
+      "test_data_json": {},
       "steps": [
         "Open login",
         "Submit form"
@@ -234,15 +236,24 @@
       "expected_results": [
         "Dashboard loads"
       ],
-      "related_workflow_id": null
+      "related_workflow_id": null,
+      "status": "passed",
+      "actual_result": "The application responded as expected \u2014 test passed.",
+      "test_case_type": "positive",
+      "friendly_id": "TC_LOGIN_POS_001",
+      "test_data_formatted": "",
+      "execution_status": "Executed",
+      "result": "Pass"
     },
     {
       "test_id": "tc-002",
       "title": "Search inventory",
-      "description": "",
+      "description": "Search inventory",
       "category": "functional",
       "priority": "medium",
       "preconditions": [],
+      "test_data": [],
+      "test_data_json": {},
       "steps": [
         "Open inventory",
         "Search"
@@ -250,7 +261,14 @@
       "expected_results": [
         "Results table updates"
       ],
-      "related_workflow_id": null
+      "related_workflow_id": null,
+      "status": "failed",
+      "actual_result": "The application did not respond as expected \u2014 test failed.",
+      "test_case_type": "positive",
+      "friendly_id": "TC_SEARCH_POS_001",
+      "test_data_formatted": "",
+      "execution_status": "Executed",
+      "result": "Fail"
     }
   ],
   "test_executions": [
@@ -261,7 +279,7 @@
       "status": "passed",
       "notes": "OK",
       "evidence_ids": [],
-      "executed_at": "2026-08-31T12:14:33.281054"
+      "executed_at": "2026-10-04T12:53:18.496686"
     },
     {
       "execution_id": "ex-002",
@@ -270,7 +288,7 @@
       "status": "failed",
       "notes": "Authorization: Bearer ***REDACTED***",
       "evidence_ids": [],
-      "executed_at": "2026-08-31T12:14:33.281065"
+      "executed_at": "2026-10-04T12:53:18.496696"
     }
   ],
   "confirmed_bugs": [
@@ -300,13 +318,13 @@
       "trace_evidence": [],
       "console_evidence": [],
       "network_evidence": [],
-      "discovery_timestamp": "2026-08-31T12:14:33.281102",
+      "discovery_timestamp": "2026-10-04T12:53:18.496718",
       "run_id": "sample-run-001"
     }
   ],
   "suspected_bugs": [
     {
-      "bug_id": "analysis-4754888",
+      "bug_id": "analysis-7068568",
       "title": "Console TypeError on login",
       "module": "Authentication",
       "page": "",
@@ -326,7 +344,7 @@
       "trace_evidence": [],
       "console_evidence": [],
       "network_evidence": [],
-      "discovery_timestamp": "2026-08-31T12:14:33.282747",
+      "discovery_timestamp": "2026-10-04T12:53:18.500035",
       "run_id": "sample-run-001"
     }
   ],
@@ -671,7 +689,7 @@
     "Modules": "- **Authentication**: Authentication area of the application (1 pages)\n- **Dashboard**: Dashboard area of the application (1 pages)\n- **Inventory**: Inventory area of the application (1 pages)",
     "Navigation Structure": "```mermaid\nflowchart TD\n  P0[\"Login\"]\n  P1[\"Dashboard\"]\n  P2[\"Inventory GemmaQA Demo\"]\n  P0 -->|submit| P1\n  P1 -->|click| P2\n```",
     "Page Inventory": "| Title | URL | Type |\n| --- | --- | --- |\n| Login | https://demo.gemmaqa.local/login | authentication |\n| Dashboard | https://demo.gemmaqa.local/dashboard | dashboard |\n| Inventory / GemmaQA Demo | https://demo.gemmaqa.local/inventory | list |",
-    "Forms Inventory": "| Form ID | Page URL | Fields | Method |\n| --- | --- | --- | --- |\n| 56f308a0-f896-4ab0-88d2-d865f5a55887 | https://demo.gemmaqa.local/login | 2 | POST |\n| 94b25886-2c2d-45c4-af8b-362421d583db | https://demo.gemmaqa.local/inventory | 1 | GET |",
+    "Forms Inventory": "| Form ID | Page URL | Fields | Method |\n| --- | --- | --- | --- |\n| ba95aee3-6861-4564-8387-47c7aaaf9423 | https://demo.gemmaqa.local/login | 2 | POST |\n| 313660e8-4f3a-4ea4-aae5-00308b1c88e7 | https://demo.gemmaqa.local/inventory | 1 | GET |",
     "Form Lifecycle": "- Forms discovered: 2\n\n**By lifecycle state:**\n- discovered: 2",
     "Tables Inventory": "| Table ID | Page URL | Headers | Rows |\n| --- | --- | --- | --- |\n| tbl-tickets | https://demo.gemmaqa.local/dashboard | ID, Subject, Status | 3 |",
     "Collection/Grid Coverage": "_No record-collection (grid/table/card-list) surfaces detected this run._",
@@ -691,7 +709,7 @@
     "Blocked Scenarios": "_No scenarios are currently blocked._",
     "Unexecuted Scenarios": "_Every generated scenario reached a terminal executed outcome._",
     "Confirmed Bugs": "**HTTP 500 on session endpoint**\n- **Bug ID:** `BUG-001`\n- **Module:** Authentication\n- **Page / URL:** Login / `https://demo.gemmaqa.local/login`\n- **Classification:** confirmed_bug\n- **Severity / Priority:** critical / medium\n- **Expected:** 200 OK\n- **Actual:** 500 with Authorization: ***REDACTED***\n- **Possible root cause (hypothesis only):** Unhandled exception in session service\n- **Confidence:** 0.95\n- **Steps:**\n  1. Open login\n  2. Submit credentials\n",
-    "Suspected Bugs": "**Console TypeError on login**\n- **Bug ID:** `analysis-4754888`\n- **Module:** Authentication\n- **Page / URL:** n/a / `https://demo.gemmaqa.local/login`\n- **Classification:** suspected_bug\n- **Severity / Priority:** medium / medium\n- **Expected:** No console errors\n- **Actual:** TypeError: x is undefined\n- **Possible root cause (hypothesis only):** Hypothesis only \u2014 not verified\n- **Confidence:** 0.6\n",
+    "Suspected Bugs": "**Console TypeError on login**\n- **Bug ID:** `analysis-7068568`\n- **Module:** Authentication\n- **Page / URL:** n/a / `https://demo.gemmaqa.local/login`\n- **Classification:** suspected_bug\n- **Severity / Priority:** medium / medium\n- **Expected:** No console errors\n- **Actual:** TypeError: x is undefined\n- **Possible root cause (hypothesis only):** Hypothesis only \u2014 not verified\n- **Confidence:** 0.6\n",
     "UX and Quality Observations": "- Inventory list has no breadcrumb trail",
     "Coverage Summary": "- Pages discovered: 3\n- Pages explored: 3\n- Observed anonymous surface coverage: none (0 anonymous page(s))\n- Authenticated exploration coverage: none (0 authenticated page(s))\n- Known-application coverage confidence: exploratory / incomplete\n- Overall discovery completeness: not complete application coverage\n- Observed coverage (visited/discovered ratio): 100.0%\n- Explored coverage: 100.0%\n- Executed coverage: 100.0%\n- Authentication status: unknown\n- Authentication method: n/a\n- Authentication blocker: none\n- Forms discovered/inspected/tested: 2/0/0\n- Tables discovered/inspected: 1/0\n- Tests generated/executed (legacy Tester): 2/2 (passed=1, failed=1)\n- Local-control coverage: 0/0 (0.0%)\n- Collections/grids discovered/inspected: 0/0 (0.0%)\n- Goals generated: 0\n- Scenario Planning scenarios generated/executable/executed: 0/0/0 (passed=0, failed=0, blocked=0)\n- CRUD create discovered/executed: 0/0\n- CRUD read (collection) discovered/executed: 0/0\n- CRUD update discovered/executed: 0/0\n- CRUD delete discovered/executed: 0/0\n- Verification coverage (assertions evaluated/supported): 0/0 (contradicted=0, inconclusive=0)\n- Cleanup coverage (succeeded/pending/manual): 0/0/0 (0.0%)\n- Bugs / suspected / observations: 1/1/1\n- Actions executed: 1\n\n_Coverage percentages reflect observed exploratory activity only and do not claim complete application coverage. Exploration coverage (pages visited/discovered) is NOT test coverage: see generated vs. executed scenario counts, CRUD-operation discovered/executed/verified counts, and assertion verification counts for what was actually tested and confirmed._",
     "Temporary Records": "_No temporary test records were created this run._",
@@ -872,7 +890,7 @@
         "confirmed_bug",
         "Authentication"
       ],
-      "created_at": "2026-08-31T12:14:33.281102",
+      "created_at": "2026-10-04T12:53:18.496718",
       "module": "Authentication",
       "page_title": "Login",
       "classification": "confirmed_bug",

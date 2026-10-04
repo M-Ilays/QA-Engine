@@ -436,9 +436,15 @@ def bug_analysis_to_defect(analysis: BugAnalysisResult, run_id: str, page_url: s
         steps_to_reproduce=list(analysis.steps),
         expected=analysis.expected_result,
         actual=analysis.actual_result,
-        page_url=page_url,
+        page_url=page_url or analysis.page_url,
         evidence_ids=list(analysis.evidence_ids),
         tags=[analysis.classification.value, analysis.module] if analysis.module else [analysis.classification.value],
+        module=analysis.module or None,
+        classification=analysis.classification.value,
+        priority=analysis.priority,
+        business_impact=analysis.business_impact or None,
+        possible_root_cause=analysis.possible_root_cause,
+        confidence=analysis.confidence,
     )
 
 

@@ -25,7 +25,6 @@ router = APIRouter(prefix="/api", tags=["health"])
 @router.get("/health")
 async def api_health() -> dict[str, Any]:
     settings = get_settings()
-    from app.strands_agent.service import strands_status
 
     return {
         "status": "ok",
@@ -33,26 +32,12 @@ async def api_health() -> dict[str, Any]:
         "version": settings.app_version,
         "provider_type": settings.normalized_gemma_provider,
         "browser_adapter": settings.normalized_browser_adapter,
-        "strands": strands_status(),
     }
 
 
-def _provider_auth_fields(settings: Any) -> dict[str, Any]:
-    """Region and auth posture, described without revealing any credential.
-
-    `auth_configured` is a bool and `auth_mode` names a mechanism — neither is
-    derived from the token's value beyond "is one present". `None` rather than
-    `False` for non-Bedrock providers, because "not applicable" and "no auth
-    configured" are different claims and only one of them is true here.
-    """
-    if settings.normalized_gemma_provider != "bedrock":
-        return {"region": None, "auth_configured": None, "auth_mode": None}
-    configured = settings.bedrock_auth_configured
-    return {
-        "region": settings.aws_region or None,
-        "auth_configured": configured,
-        "auth_mode": "bearer_token" if configured else "aws_credential_chain",
-    }
+def _provider_auth_fields(_settings: Any) -> dict[str, Any]:
+    """Kept on the health payload so older clients still see the keys."""
+    return {"region": None, "auth_configured": None, "auth_mode": None}
 
 
 @router.get("/health/gemma")
@@ -99,8 +84,8 @@ async def health_gemma() -> dict[str, Any]:
 
     configured = bool(snapshot.get("configured"))
     # `health_check()` returning True means "reachable" ONLY for providers that
-    # can actually probe liveness for free. For one that cannot (Bedrock), a True
-    # means "configuration is valid" and must not be promoted to evidence of
+    # can actually probe liveness for free. When a provider cannot, a True means
+    # "configuration is valid" and must not be promoted to evidence of
     # reachability — otherwise a provider that has never been called once is
     # reported as reachable.
     probe_proves_reachability = getattr(provider, "supports_liveness_probe", True)
@@ -113,10 +98,8 @@ async def health_gemma() -> dict[str, Any]:
         "status": "ok" if configured else "misconfigured",
         "provider_type": snapshot.get("provider_type") or settings.normalized_gemma_provider,
         "configured": configured,
-        # Meaning preserved exactly: True only after a real successful call,
-        # False only after a real failure, None when never exercised. For Bedrock
-        # this stays None until a run makes an inference call — `health_check()`
-        # deliberately does not spend a billable Converse request to find out.
+        # True only after a real successful call, False only after a real
+        # failure, None when never exercised.
         "reachable": resolved_reachable,
         # Additive: the same tri-state as a label a client cannot misread as
         # "broken". Derived by the one rule in app.gemma.health.
@@ -124,8 +107,7 @@ async def health_gemma() -> dict[str, Any]:
             configured=configured, reachable=resolved_reachable
         ),
         "model_id": snapshot.get("model_identifier") or reported_model_id() or None,
-        # Unchanged and NOT repurposed: Bedrock has no operator-set base URL, so
-        # this stays null for it. The region is reported separately below.
+        # Operator-set base URL for OpenAI-compatible endpoints. Null for mock.
         "api_base_url": (
             settings.effective_gemma_api_base or None
             if settings.normalized_gemma_provider != "mock"

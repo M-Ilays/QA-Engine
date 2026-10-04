@@ -257,6 +257,9 @@ class GenericFormWorkflow:
     primary_identity_value: str | None = None
     primary_identity_semantic_type: str | None = None
     filled_element_ids: set[str] = field(default_factory=set)
+    # One empty submit before the happy path, so signup/add/edit actually
+    # check that a validation message appears.
+    validation_checked: bool = False
     attempts: int = 0
     max_attempts: int = 3
     # Bounded regardless of WHY a step might not converge (e.g. an observed page
@@ -338,6 +341,20 @@ class GenericFormWorkflow:
         wf.form_signature = form_signature(form, page_url)
         wf.state = "classified"
         return wf
+
+    def _operation_label(self) -> str:
+        blob = f"{self.page_url} {self.purpose}".lower()
+        if any(token in blob for token in ("signup", "sign-up", "sign_up", "register", "adduser")):
+            return "signup"
+        if self.purpose == "safe_test_data_update" or "edit" in blob:
+            return "edit contact" if "contact" in blob else "edit"
+        if "delete" in blob:
+            return "delete contact" if "contact" in blob else "delete"
+        if "contact" in blob:
+            return "add contact"
+        if self.purpose == "safe_test_data_creation":
+            return "create"
+        return (self.purpose or "form").replace("_", " ")
 
     def plan_data(self) -> None:
         """classified -> data_planned: pick one safe, positive value per
@@ -501,6 +518,23 @@ class GenericFormWorkflow:
             self.state = "failed"
             self.last_error = "step_budget_exceeded"
             return None
+        if self.state == "classified" and not self.validation_checked and self.submit_element_id:
+            self.validation_checked = True
+            operation = self._operation_label()
+            return BrowserAction(
+                action=ActionType.CLICK,
+                element_id=self.submit_element_id,
+                reason=f"Submit {operation} before entering data to verify validation messages",
+                expected_result="A validation message is displayed for empty or invalid required fields.",
+                risk=RiskLevel.LOW,
+                category=ActionCategory.NEGATIVE_TEST,
+                metadata={
+                    "workflow_id": self.workflow_id,
+                    "form_id": self.form_id,
+                    "validation_probe": True,
+                    "operation": operation,
+                },
+            )
         if self.state == "classified":
             self.plan_data()
         if self.state == "data_planned":
@@ -561,6 +595,7 @@ class GenericFormWorkflow:
                     "form_id": self.form_id,
                     "form_workflow_write": True,
                     "form_workflow_submit": True,
+                    "operation": self._operation_label(),
                 },
             )
         return None

@@ -86,34 +86,70 @@ export function sameData(previous: unknown, next: unknown): boolean {
   }
 }
 
+function asStringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((item) => String(item)) : [];
+}
+
 function bugFromApi(b: BugItem, runId: string): BugReportEntry {
   const p = b.payload || {};
+  const tags = asStringList(p.tags);
+  const classification = String(p.classification || tags[0] || "confirmed_bug");
   return {
     bug_id: b.id,
     title: b.title,
-    module: String(p.module || ""),
-    page: String(p.page || ""),
-    url: String(p.url || ""),
-    classification: String(p.classification || "suspected_bug"),
+    module: String(p.module || tags[1] || ""),
+    page: String(p.page || p.page_title || ""),
+    url: String(p.url || p.page_url || ""),
+    classification,
     severity: b.severity,
     priority: String(p.priority || "medium"),
-    preconditions: Array.isArray(p.preconditions) ? (p.preconditions as string[]) : [],
-    test_data: "",
-    steps_to_reproduce: Array.isArray(p.steps) ? (p.steps as string[]) : [],
-    expected_result: String(p.expected || p.expected_result || ""),
-    actual_result: String(p.actual || p.actual_result || b.description),
+    preconditions: asStringList(p.preconditions),
+    test_data: String(p.test_data || ""),
+    steps_to_reproduce: asStringList(p.steps_to_reproduce || p.steps),
+    expected_result: String(p.expected_result || p.expected || ""),
+    actual_result: String(p.actual_result || p.actual || b.description || ""),
     business_impact: String(p.business_impact || ""),
-    possible_root_cause_hypothesis: String(p.possible_root_cause || ""),
+    possible_root_cause_hypothesis: String(
+      p.possible_root_cause_hypothesis || p.possible_root_cause || "",
+    ),
     confidence: Number(p.confidence ?? 0.5),
-    screenshot_evidence: Array.isArray(p.screenshot_evidence)
-      ? (p.screenshot_evidence as string[])
-      : [],
-    trace_evidence: [],
-    console_evidence: [],
-    network_evidence: [],
-    discovery_timestamp: null,
+    screenshot_evidence: asStringList(p.screenshot_evidence),
+    trace_evidence: asStringList(p.trace_evidence),
+    console_evidence: asStringList(p.console_evidence),
+    network_evidence: asStringList(p.network_evidence),
+    discovery_timestamp: p.created_at ? String(p.created_at) : null,
     run_id: runId,
   };
+}
+
+function mergeBugLists(stored: BugReportEntry[], reported: BugReportEntry[]): BugReportEntry[] {
+  const byId = new Map<string, BugReportEntry>();
+  for (const bug of stored) byId.set(bug.bug_id, bug);
+  for (const bug of reported) {
+    const previous = byId.get(bug.bug_id);
+    if (!previous) {
+      byId.set(bug.bug_id, bug);
+      continue;
+    }
+    byId.set(bug.bug_id, {
+      ...previous,
+      ...bug,
+      url: bug.url || previous.url,
+      page: bug.page || previous.page,
+      module: bug.module || previous.module,
+      expected_result: bug.expected_result || previous.expected_result,
+      actual_result: bug.actual_result || previous.actual_result,
+      business_impact: bug.business_impact || previous.business_impact,
+      steps_to_reproduce: bug.steps_to_reproduce?.length
+        ? bug.steps_to_reproduce
+        : previous.steps_to_reproduce,
+      screenshot_evidence: bug.screenshot_evidence?.length
+        ? bug.screenshot_evidence
+        : previous.screenshot_evidence,
+      classification: bug.classification || previous.classification,
+    });
+  }
+  return [...byId.values()];
 }
 
 export function LiveRunPage() {
@@ -151,8 +187,7 @@ export function LiveRunPage() {
       if (typeof r.action_pause === "number") setActionPause(r.action_pause);
       setPages((prev) => (sameData(prev, p) ? prev : p));
       setActions((prev) => (sameData(prev, a) ? prev : a));
-      const mapped = b.map((x) => bugFromApi(x, runId));
-      setBugs((prev) => (sameData(prev, mapped) ? prev : mapped));
+      let nextBugs = b.map((x) => bugFromApi(x, runId));
       setError(null);
 
       const terminal = ["completed", "failed", "cancelled", "stopped"].includes(r.status);
@@ -166,14 +201,14 @@ export function LiveRunPage() {
           setReport((prev) => (sameData(prev, rep) ? prev : rep));
           setEvidence((prev) => (sameData(prev, ev) ? prev : ev));
           setMermaid(nav || rep.navigation_structure || "");
-          if (rep.confirmed_bugs?.length || rep.suspected_bugs?.length) {
-            const fromReport = [...(rep.confirmed_bugs || []), ...(rep.suspected_bugs || [])];
-            setBugs((prev) => (sameData(prev, fromReport) ? prev : fromReport));
-          }
+          const fromReport = [...(rep.confirmed_bugs || []), ...(rep.suspected_bugs || [])];
+          nextBugs = mergeBugLists(nextBugs, fromReport);
         } catch {
           // report may not exist yet mid-run
         }
       }
+      const bugList = nextBugs;
+      setBugs((prev) => (sameData(prev, bugList) ? prev : bugList));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load run");
     }
@@ -377,7 +412,7 @@ export function LiveRunPage() {
           <div className="grid grid-cols-3 gap-2">
             <Stat label="Actions" value={run.actions_taken} />
             <Stat label="Pages" value={run.pages_visited} />
-            <Stat label="Bugs" value={run.bugs_found} />
+            <Stat label="Bugs" value={bugs.length || run.bugs_found} />
           </div>
           <ExecutionPacingControls
             speed={speed}
@@ -468,19 +503,46 @@ export function LiveRunPage() {
 
           {tab === "tests" ? (
             <div className="space-y-3">
-              {tests.map((t) => (
+              {/* Quick-link to full test cases page */}
+              {tests.length > 0 && (
                 <Link
-                  key={t.test_id}
-                  to={`/runs/${runId}/tests/${t.test_id}`}
-                  className="surface block p-4 hover:border-tide-500/30"
+                  to={`/runs/${runId}/test-cases`}
+                  className="flex items-center justify-between rounded-xl border border-tide-500/30 bg-tide-500/5 px-4 py-2 text-sm text-tide-400 hover:bg-tide-500/10"
                 >
-                  <p className="font-mono text-xs text-slate-500">{t.test_id}</p>
-                  <p className="mt-1 font-medium text-white">{t.title}</p>
-                  <p className="mt-1 text-xs uppercase tracking-wider text-slate-500">
-                    {t.category} · {t.priority}
-                  </p>
+                  <span>📋 View full test case report</span>
+                  <span>→</span>
                 </Link>
-              ))}
+              )}
+              {tests.map((t) => {
+                const internalStatus = t.status ?? "not_tested";
+                const execStatus = internalStatus === "passed" || internalStatus === "failed"
+                  ? "Executed" : "Not Executed";
+                const result = internalStatus === "passed" ? "Pass"
+                  : internalStatus === "failed" ? "Fail" : "N/A";
+                const resultColour = result === "Pass" ? "text-emerald-400"
+                  : result === "Fail" ? "text-rose-400" : "text-slate-500";
+                return (
+                  <Link
+                    key={t.test_id}
+                    to={`/runs/${runId}/test-cases`}
+                    className="surface block p-4 hover:border-tide-500/30"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-mono text-xs text-slate-500">{t.test_id}</p>
+                        <p className="mt-1 font-medium text-white truncate">{t.title}</p>
+                        <p className="mt-1 text-xs uppercase tracking-wider text-slate-500">
+                          {t.category} · {t.priority}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right space-y-0.5">
+                        <p className="text-xs text-slate-400">{execStatus}</p>
+                        <p className={`text-xs font-semibold ${resultColour}`}>{result}</p>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
               {!tests.length ? <EmptyState title="No tests generated yet" /> : null}
             </div>
           ) : null}
@@ -603,7 +665,7 @@ function SideList({
         {inferred ? <InferredLabel /> : null}
       </p>
       <ul className="mt-2 max-h-36 space-y-1 overflow-y-auto text-sm text-slate-300">
-        {items.slice(0, 12).map((item, i) => (
+        {items.map((item, i) => (
           <li key={`${item}-${i}`} className="truncate">
             {item}
           </li>

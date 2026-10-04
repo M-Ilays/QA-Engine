@@ -182,7 +182,7 @@ def test_from_text_accepts_a_measured_latency():
 
 
 def test_result_telemetry_excludes_the_model_output():
-    result = ModelCallResult(text=f"the model echoed {SECRET}", provider="bedrock")
+    result = ModelCallResult(text=f"the model echoed {SECRET}", provider="gemini")
     telemetry = result.telemetry()
 
     assert SECRET not in repr(telemetry)
@@ -192,7 +192,7 @@ def test_result_telemetry_excludes_the_model_output():
 def test_result_telemetry_excludes_the_raw_payload():
     result = ModelCallResult(
         text="ok",
-        provider="bedrock",
+        provider="gemini",
         raw_response={"echoed_prompt": SECRET, "authorization": SECRET},
     )
 

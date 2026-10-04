@@ -1,5 +1,5 @@
 # Optional Google Gemini API (GEMMA_PROVIDER=gemini).
-# Not required for Strands / Bedrock / Ollama / Mock.
+# Not required for Ollama or Mock.
 #
 #   pip install -r requirements-gemini.txt
 

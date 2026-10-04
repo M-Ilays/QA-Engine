@@ -209,7 +209,27 @@ def test_scenario_titles_use_field_labels_not_el_ids():
     )
     specs = tester._deterministic_specs(page)
     titles = [s["title"] for s in specs]
-    assert any("First Name" in t for t in titles)
-    assert any("Email" in t for t in titles)
-    assert not any("el_001" in t or "el_002" in t for t in titles)
+    blobs = [f"{s['title']} {s.get('description', '')}" for s in specs]
+    assert any("First Name" in blob for blob in blobs)
+    assert any("Email" in blob for blob in blobs)
+    assert not any("el_001" in blob or "el_002" in blob for blob in blobs)
     assert any(t.startswith("Smoke:") and "/addUser" in t for t in titles)
+
+    focused = tester._deterministic_specs(
+        page,
+        focus_modules=["signup"],
+        test_case_types=["positive"],
+    )
+    assert focused == []
+
+    signup_page = page.model_copy(update={"headings": ["Sign up to begin adding your contacts!"]})
+    signup_specs = tester._deterministic_specs(
+        signup_page,
+        focus_modules=["signup"],
+        test_case_types=["positive"],
+    )
+    signup_titles = [s["title"] for s in signup_specs]
+    assert signup_titles
+    assert all(not t.startswith("Smoke:") for t in signup_titles)
+    assert all(s.get("test_case_type") == "positive" for s in signup_specs)
+    assert not any("empty" in t.lower() for t in signup_titles)

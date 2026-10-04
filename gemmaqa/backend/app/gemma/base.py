@@ -172,7 +172,7 @@ class GemmaProvider(ABC):
     # Whether `health_check()` can establish REACHABILITY, or only configuration.
     # True for every provider with a free liveness endpoint (an OpenAI-compatible
     # `/models`, a local pipeline). False when the only probe available is a
-    # billable inference request — Bedrock Runtime has no free alternative — in
+    # billable inference request, in
     # which case `health_check()` reports configuration validity ONLY, and
     # `reachable` must stay None until a real call proves it either way.
     #

@@ -100,16 +100,6 @@ export interface CreateRunResponse {
   message: string;
 }
 
-export interface StrandsStatus {
-  installed: boolean;
-  enabled: boolean;
-  configured: boolean;
-  ready: boolean;
-  model_id: string | null;
-  aws_region: string | null;
-  sdk: string;
-}
-
 export interface RunStatus {
   run_id: string;
   status: RunStatusEnum;
@@ -231,9 +221,35 @@ export interface TestScenario {
   category: string;
   priority: string;
   preconditions: string[];
+  test_data: string[];
   steps: string[];
   expected_results: string[];
+  actual_result?: string;
+  status?: "passed" | "failed" | "not_tested";
   related_workflow_id?: string | null;
+}
+
+export interface TestCase {
+  /** Human-readable ID: TC_SIGNUP_POS_001 */
+  test_case_id: string;
+  test_case_type: "positive" | "negative" | "exploratory";
+  title: string;
+  description: string;
+  /** Multiline "Field: Value" string for table display */
+  test_data: string;
+  /** Structured JSON test data for rendering */
+  test_data_json: Record<string, string>;
+  /** "Executed" or "Not Executed" */
+  execution_status: "Executed" | "Not Executed";
+  /** "Pass", "Fail", or "N/A" */
+  result: "Pass" | "Fail" | "N/A";
+  // Detail panel fields
+  category: string;
+  priority: string;
+  preconditions: string[];
+  test_steps: string[];
+  expected_result: string[];
+  actual_result: string;
 }
 
 export interface TestExecution {

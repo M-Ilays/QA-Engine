@@ -6,7 +6,7 @@ GemmaQA opens a real browser, explores the target, fills and submits forms, exer
 
 | | |
 |---|---|
-| **Coordinator** | AWS Strands Agents SDK + Amazon Bedrock |
+| **QA engine** | AgentController + Playwright |
 | **Browser** | Direct Playwright (Chromium) |
 | **Canonical demo** | [Thinking Tester Contact List](https://thinking-tester-contact-list.herokuapp.com/) |
 | **Source** | [github.com/M-Ilays/GemmaQA](https://github.com/M-Ilays/GemmaQA) |
@@ -27,11 +27,11 @@ QA engineers and developers who still do exploratory testing, retesting of fixes
 You submit an authorized URL (and optional credentials) from the New Run UI. The backend starts a QA run, launches Chromium via Playwright, and drives one safe action at a time.
 
 1. Perception and planning engines observe the page and choose the next action.
-2. The Model dropdown (Gemini, Ollama, Bedrock, Mock, …) supports page analysis, action selection, and bug evaluation.
+2. The Model dropdown (Gemini, Ollama, Mock, …) supports page analysis, action selection, and bug evaluation.
 3. Evidence (screenshots, traces, activity log, reports) is written under `gemmaqa/evidence/<run_id>/`.
 4. You can **Pause**, **Continue**, **End Run**, and adjust **Execution Speed** / **Action Pause** while the run is live.
 
-New Run can go through the **AWS Strands Agents SDK** (`POST /api/runs/strands`), then AgentController + Playwright. Gemini is optional, not required.
+New Run starts AgentController + Playwright. Gemini is optional, not required.
 
 ---
 
@@ -45,7 +45,6 @@ New Run can go through the **AWS Strands Agents SDK** (`POST /api/runs/strands`)
 - Live activity log over WebSockets
 - Operator controls: Pause, Continue, End Run, Execution Speed, Action Pause
 - Safety checks: authorized domain, action classification, destructive-action permission
-- Official **AWS Strands** coordinator on New Run
 
 ---
 
@@ -55,28 +54,20 @@ Full write-up: [`ARCHITECTURE.md`](ARCHITECTURE.md). Diagram for judges:
 
 ![GemmaQA architecture](docs/architecture.png)
 
-### AWS Strands path (Agents for Humans)
-
 ```
 GemmaQA UI / API
-  → Strands Agent  (strands-agents + Amazon Bedrock)
-    → tools: create / start / pause / resume / end
   → AgentController
-    → chosen model (Gemini, Ollama, Bedrock, Mock, …)
+    → chosen model (Gemini, Ollama, Mock, …)
     → Playwright
     → Target website
 ```
-
-`POST /api/runs/strands` always uses this path. `POST /api/runs` uses AgentController directly unless `USE_STRANDS_ORCHESTRATION=true`.
-
-**Optional: AgentCore deployment** deploys the Strands coordinator to Amazon Bedrock AgentCore Runtime (managed serverless). See [`gemmaqa/docs/AGENTCORE_DEPLOYMENT.md`](gemmaqa/docs/AGENTCORE_DEPLOYMENT.md).
 
 | Layer | Stack |
 |---|---|
 | Frontend | React, Vite, TypeScript, Tailwind CSS |
 | Backend | Python 3.11+, FastAPI, Playwright, Pydantic, SQLAlchemy, SQLite, WebSockets |
-| Coordinator | `strands-agents` Agent + Amazon Bedrock |
-| Optional QA model | Gemini API, Ollama, Bedrock, Mock |
+| QA engine | AgentController |
+| Optional QA model | Gemini API, Ollama, Mock |
 | Browser | Direct Playwright Chromium (default). Playwright MCP is an optional adapter. |
 
 ---
@@ -136,7 +127,6 @@ This is not a claim that every Contact List feature was exhaustively tested.
 - Node.js 18+
 - Git
 - Optional: Google AI Studio / Gemini API key (`GEMMA_PROVIDER=gemini`)
-- Optional: AWS credentials or `AWS_BEARER_TOKEN_BEDROCK` for Strands / Bedrock
 
 ### Quick start
 
@@ -174,18 +164,15 @@ python -m venv .venv
 source .venv/bin/activate
 
 pip install -r requirements.txt
-pip install -r requirements-strands.txt   # official AWS Strands SDK
 # Optional Model-dropdown backend:
 # pip install -r requirements-gemini.txt   # google-genai only
 playwright install chromium
 copy .env.example .env   # or: cp .env.example .env
 ```
 
-Then set AWS + an optional QA model (placeholders only — never commit real secrets):
+Then set an optional QA model (placeholders only — never commit real secrets):
 
 ```env
-AWS_REGION=us-east-1
-BEDROCK_MODEL_ID=amazon.nova-lite-v1:0
 # Optional: GEMMA_PROVIDER=gemini and GEMINI_API_KEY=...
 BROWSER_ADAPTER=direct_playwright
 ```
@@ -228,31 +215,7 @@ Providers are selected by `GEMMA_PROVIDER`. Models are not loaded at import time
 | `gemini` | Optional — Google Gemini API (`GEMINI_API_KEY`) |
 | `openai_compatible` | Optional local rollback (Ollama, LM Studio, vLLM, …) |
 | `mock` | Deterministic heuristics for CI / unit tests (no live model) |
-| `bedrock` / `transformers` | Optional alternate backends. Bedrock is the model for the Strands path. |
-
-### AWS Strands Agents (hackathon path)
-
-Install the official SDK (does not change your local `.env`):
-
-```bash
-cd gemmaqa/backend
-pip install -r requirements-strands.txt
-```
-
-Add these to a **local** `.env` when you have AWS credentials (never commit them):
-
-```env
-USE_STRANDS_ORCHESTRATION=true
-AWS_REGION=us-east-1
-BEDROCK_MODEL_ID=YOUR_BEDROCK_MODEL_ID
-GEMMA_PROVIDER=bedrock
-```
-
-- `POST /api/runs/strands` always uses the Strands coordinator.
-- New Run UI keeps calling `POST /api/runs`. Set `USE_STRANDS_ORCHESTRATION=true` to route that through Strands.
-- Tools wrap existing `run_manager` (create/start/pause/resume/end). AgentController and Playwright are unchanged.
-- Health: `GET /api/health` includes a `strands` object (no secrets).
-- Unit tests do not call Amazon Bedrock.
+| `transformers` | Optional local Hugging Face backend. |
 
 Live Gemini example:
 
@@ -300,8 +263,7 @@ Useful API routes:
 |---|---|---|
 | GET | `/health` | Process health |
 | GET | `/api/ai/health` | Provider config health (no secrets) |
-| POST | `/api/runs` | Create and start a QA run (Strands if `USE_STRANDS_ORCHESTRATION=true`) |
-| POST | `/api/runs/strands` | Strands Agents SDK coordinator → existing AgentController |
+| POST | `/api/runs` | Create and start a QA run |
 | POST | `/api/runs/{id}/pause` | Pause |
 | POST | `/api/runs/{id}/resume` | Continue |
 | POST | `/api/runs/{id}/end` | End run |
@@ -342,7 +304,7 @@ A live Cloud Run deploy needs a billed GCP project, Artifact Registry, and Secre
 ├── deploy/                    Cloud Run spec and example gcloud command
 ├── gemmaqa/
 │   ├── README.md              Same product README (nested copy)
-│   ├── backend/               FastAPI + AgentController + Playwright + Strands
+│   ├── backend/               FastAPI + AgentController + Playwright
 │   ├── frontend/              React dashboard (New Run, live run, reports)
 │   ├── docs/                  Engine and system documentation
 │   ├── evidence/              Per-run screenshots, traces, reports (generated, gitignored)
@@ -358,7 +320,6 @@ Further reading: [`gemmaqa/docs/system/DOCUMENTATION_INDEX.md`](gemmaqa/docs/sys
 
 ## Hackathon notes
 
-- Hackathon path: **AWS Strands Agents SDK** + Amazon Bedrock coordinator, then AgentController + Playwright.
 - Optional QA model: Google Gemini API (`GEMMA_PROVIDER=gemini`) from the Model dropdown.
 - Demo app: Thinking Tester Contact List, not an in-house sample.
 - Action/page budgets and the 15-minute runtime cap are removed; safety policy and operator End Run remain.

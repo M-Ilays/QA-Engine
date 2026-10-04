@@ -18,7 +18,6 @@ describe("demo fixtures", () => {
       "mock",
       "openai_compatible",
       "gemini",
-      "bedrock",
       "transformers",
     ]);
     await expect(demoApi.setProvider("gemini")).rejects.toThrow(/demo mode/i);

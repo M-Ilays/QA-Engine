@@ -163,33 +163,55 @@ class ReportExporter:
         return path
 
     def export_tests_csv(self, report: FinalReport) -> Path:
+        """Export test cases in standardised QA format."""
         path = self.out_dir / "tests.csv"
         fieldnames = [
-            "test_id",
-            "title",
+            "test_case_id",
             "description",
+            "test_data",
+            "test_steps",
+            "expected_result",
+            "actual_result",
+            "execution_status",
+            "result",
             "category",
             "priority",
-            "preconditions",
-            "steps",
-            "expected_results",
-            "related_workflow_id",
         ]
         rows = []
         for t in report.test_scenarios:
-            rows.append(
-                {
-                    "test_id": t.test_id,
-                    "title": redact_value(t.title),
-                    "description": redact_value(t.description),
-                    "category": t.category,
-                    "priority": t.priority,
-                    "preconditions": " | ".join(t.preconditions),
-                    "steps": " | ".join(t.steps),
-                    "expected_results": " | ".join(t.expected_results),
-                    "related_workflow_id": t.related_workflow_id or "",
-                }
-            )
+            friendly = getattr(t, "friendly_id", "") or t.test_id
+            description = redact_value(getattr(t, "description", "") or t.title)
+
+            # Test data: prefer structured JSON → formatted list → raw list
+            td_json = getattr(t, "test_data_json", {}) or {}
+            td_fmt = getattr(t, "test_data_formatted", "") or ""
+            if not td_fmt and td_json:
+                td_fmt = "\n".join(f"{k}: {v}" for k, v in td_json.items())
+            if not td_fmt:
+                raw_list = getattr(t, "test_data", []) or []
+                td_fmt = " | ".join(raw_list) if raw_list else ""
+
+            # Determine execution_status and result — always from internal status
+            internal = getattr(t, "status", "not_tested")
+            exec_status = getattr(t, "execution_status", None)
+            if not exec_status or exec_status == "Not Executed":
+                exec_status = "Executed" if internal in ("passed", "failed") else "Not Executed"
+            result = getattr(t, "result", None)
+            if not result or result == "N/A":
+                result = "Pass" if internal == "passed" else ("Fail" if internal == "failed" else "N/A")
+
+            rows.append({
+                "test_case_id": friendly,
+                "description": description,
+                "test_data": td_fmt,
+                "test_steps": " | ".join(t.steps),
+                "expected_result": " | ".join(t.expected_results),
+                "actual_result": redact_value(getattr(t, "actual_result", "")),
+                "execution_status": exec_status,
+                "result": result,
+                "category": t.category,
+                "priority": t.priority,
+            })
         self._write_csv(path, fieldnames, rows)
         return path
 

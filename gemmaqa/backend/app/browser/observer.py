@@ -331,6 +331,23 @@ OBSERVE_SCRIPT = """
     .filter((text, i, all) => all.indexOf(text) === i)
     .slice(0, 10);
 
+  // Native browser validation (the bubble "Please fill out this field") is not
+  // in the DOM. After Submit it lives on the invalid control as validationMessage.
+  Array.from(document.querySelectorAll('input, select, textarea')).forEach((el) => {
+    if (alerts.length >= 10) return;
+    let message = '';
+    try {
+      if (el.willValidate && el.validity && !el.validity.valid) {
+        message = String(el.validationMessage || '').trim();
+      }
+    } catch (e) {}
+    if (!message) return;
+    let label = '';
+    try { label = labelFor(el); } catch (e) {}
+    const line = label ? (label + ': ' + message) : message;
+    if (!alerts.includes(line)) alerts.push(line.slice(0, 300));
+  });
+
   const pagination_controls = Array.from(
     document.querySelectorAll('[aria-label*="pagination" i] a, [aria-label*="pagination" i] button, .pagination a, .pagination button, nav[aria-label*="Page" i] a')
   ).map(el => textOf(el) || el.getAttribute('aria-label') || '').filter(Boolean).slice(0, 20);

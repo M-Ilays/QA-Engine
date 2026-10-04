@@ -12,7 +12,6 @@ from app.schemas import (
     BugAnalysisResult,
     BugClassification,
     Defect,
-    DefectSeverity,
     PageState,
 )
 from app.utils.ids import new_id
@@ -207,23 +206,6 @@ class BugAnalyzer:
                     analysis.title or defect.title,
                 )
 
-        # Extra heuristic: empty title
-        if not (page_state.title or "").strip():
-            defects.append(
-                Defect(
-                    bug_id=new_id(),
-                    run_id=run_id,
-                    title="Missing page title",
-                    description="The page has an empty document title.",
-                    severity=DefectSeverity.MINOR,
-                    steps_to_reproduce=[f"Navigate to {page_state.url}", "Inspect document.title"],
-                    expected="Meaningful page title",
-                    actual="Empty title",
-                    page_url=page_state.url,
-                    tags=["observation", "accessibility"],
-                )
-            )
-
         return self._dedupe(defects)
 
     def deterministic_signals(
@@ -305,6 +287,17 @@ class BugAnalyzer:
                     possible_root_cause="Hypothesis only: broken route or missing resource",
                 )
             )
+
+        missing_validation = self._missing_validation_after_submit(
+            page_state, action_result, before_state
+        )
+        if missing_validation is not None:
+            findings.append(missing_validation)
+        missing_delete_confirm = self._missing_delete_confirmation(
+            page_state, action_result, before_state
+        )
+        if missing_delete_confirm is not None:
+            findings.append(missing_delete_confirm)
 
         # Required field accepted empty (heuristic): filled empty then navigated with success toast without validation
         if action_result and action_result.action.action.value == "fill":
@@ -399,6 +392,145 @@ class BugAnalyzer:
             findings.append(inconsistency)
 
         return findings
+
+    _SUBMIT_HINTS = (
+        "submit",
+        "register",
+        "sign up",
+        "signup",
+        "log in",
+        "login",
+        "create account",
+    )
+    _VALIDATION_HINTS = (
+        "invalid",
+        "required",
+        "please fill",
+        "please enter",
+        "please match",
+        "fill out this field",
+        "must be",
+        "must not",
+        "cannot be",
+        "can't be",
+        "error",
+        "too long",
+        "too short",
+        "already exists",
+        "not valid",
+        "not allowed",
+    )
+
+    @classmethod
+    def _is_form_submit(cls, action_result: ActionResult | None) -> bool:
+        if action_result is None:
+            return False
+        action = action_result.action
+        if getattr(action.action, "value", str(action.action)) != "click":
+            return False
+        meta = action.metadata or {}
+        if meta.get("form_workflow_submit") or meta.get("auth_submit") or meta.get("validation_probe"):
+            return True
+        blob = f"{action.reason or ''} {meta.get('action_label') or ''}".lower()
+        if "click navigation" in blob:
+            return False
+        return any(hint in blob for hint in cls._SUBMIT_HINTS)
+
+    @classmethod
+    def _validation_messages(cls, page_state: PageState) -> list[str]:
+        texts = [
+            *(page_state.alerts or []),
+            *(page_state.toasts or []),
+            *(page_state.dialogs or []),
+            *(page_state.modals or []),
+        ]
+        found: list[str] = []
+        for text in texts:
+            lowered = (text or "").lower()
+            if lowered and any(hint in lowered for hint in cls._VALIDATION_HINTS):
+                found.append(text)
+        return found
+
+    def _missing_validation_after_submit(
+        self,
+        page_state: PageState,
+        action_result: ActionResult | None,
+        before_state: PageState | None,
+    ) -> BugAnalysisResult | None:
+        """A form submit that stays on the form must show a validation message.
+
+        Leaving the form (the happy path) is not a missing-message bug.
+        Staying on the form with no validation text is.
+        """
+        if not self._is_form_submit(action_result) or before_state is None:
+            return None
+        before_url = (before_state.url or "").rstrip("/")
+        after_url = (page_state.url or "").rstrip("/")
+        if before_url and after_url and before_url != after_url:
+            return None
+        if not page_state.forms and not self._is_form_surface(page_state):
+            return None
+        if self._validation_messages(page_state):
+            return None
+        meta = (action_result.action.metadata or {}) if action_result is not None else {}
+        operation = str(meta.get("operation") or "form").strip() or "form"
+        path = (page_state.url or "").split("?", 1)[0].rstrip("/")
+        page_name = path.rsplit("/", 1)[-1] or "page"
+        return BugAnalysisResult(
+            classification=BugClassification.CONFIRMED_BUG,
+            title=f"{operation}: validation message not displayed after submit ({page_name})",
+            module=operation,
+            severity="high",
+            priority="high",
+            steps=[
+                f"Open the {operation} form",
+                "Submit it before entering valid data",
+                "Look for a validation message",
+            ],
+            expected_result="A validation message is displayed when the form is not accepted.",
+            actual_result=f"The {operation} form stayed on screen and no validation message was displayed.",
+            confidence=0.9,
+            possible_root_cause="The submit handler does not show a validation message for rejected input.",
+            page_url=page_state.url,
+        )
+
+    def _missing_delete_confirmation(
+        self,
+        page_state: PageState,
+        action_result: ActionResult | None,
+        before_state: PageState | None,
+    ) -> BugAnalysisResult | None:
+        """Delete contact must show a confirmation, or actually remove the record."""
+        if action_result is None or before_state is None:
+            return None
+        meta = action_result.action.metadata or {}
+        if meta.get("cleanup_step") != "delete_control":
+            return None
+        if page_state.dialogs or page_state.modals or self._validation_messages(page_state):
+            return None
+        before_url = (before_state.url or "").rstrip("/")
+        after_url = (page_state.url or "").rstrip("/")
+        if before_url and after_url and before_url != after_url:
+            return None
+        if (before_state.state_fingerprint or "") != (page_state.state_fingerprint or ""):
+            return None
+        return BugAnalysisResult(
+            classification=BugClassification.CONFIRMED_BUG,
+            title="delete contact: confirmation message not displayed",
+            module="delete contact",
+            severity="high",
+            priority="high",
+            steps=[
+                "Open the contact created by this run",
+                "Choose delete",
+                "Look for a confirmation message",
+            ],
+            expected_result="A confirmation message is displayed before the contact is deleted.",
+            actual_result="Delete was clicked and no confirmation message was displayed.",
+            confidence=0.85,
+            possible_root_cause="The delete control does not ask for confirmation.",
+            page_url=page_state.url,
+        )
 
     def _metric_list_inconsistency(self, page_state: PageState) -> BugAnalysisResult | None:
         """Detect dashboard-style count=0 while related records are visibly listed."""

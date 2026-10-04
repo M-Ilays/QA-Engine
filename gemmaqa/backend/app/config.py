@@ -4,11 +4,11 @@ from functools import lru_cache
 from pathlib import Path
 import os
 
-from pydantic import Field, SecretStr
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 CANONICAL_GEMMA_PROVIDERS = frozenset(
-    {"mock", "openai_compatible", "gemini", "bedrock", "transformers"}
+    {"mock", "openai_compatible", "gemini", "transformers"}
 )
 
 _RUNTIME_OVERRIDE: str | None = None
@@ -20,8 +20,6 @@ def canonical_gemma_provider(name: str, *, local_backend: str = "") -> str:
     raw = (name or "mock").lower().strip()
     if raw in {"mock", "stub", "heuristic", "dev"}:
         return "mock"
-    if raw in {"bedrock", "aws", "aws_bedrock", "amazon_bedrock"}:
-        return "bedrock"
     if raw in {"gemini", "google", "google_gemini", "google_ai"}:
         return "gemini"
     if raw in {"transformers", "hf", "huggingface"}:
@@ -118,7 +116,7 @@ class Settings(BaseSettings):
         "http://localhost:8080,http://127.0.0.1:8080"
     )
 
-    # Gemma provider: mock | openai_compatible | transformers | bedrock | gemini
+    # Gemma provider: mock | openai_compatible | transformers | gemini
     # Legacy aliases still accepted: stub/heuristic→mock, api/local/remote/ollama→openai_compatible
     gemma_provider: str = "mock"
     gemma_model_id: str = ""
@@ -150,42 +148,11 @@ class Settings(BaseSettings):
     gemma_max_tokens: int = 0
 
     # -- Google Gemini (GEMMA_PROVIDER=gemini) ---------------------------------
-    # Deliberately separate from AWS Bedrock pattern but reuses gemma_api_key.
-    # The API key is read from GEMINI_API_KEY for clarity, but internally maps
-    # to gemma_api_key (which openai_compatible also uses). Model ID defaults to
-    # the verified gemini-3.5-flash but can be overridden via GEMINI_MODEL_ID.
+    # The API key is read from GEMINI_API_KEY. Model ID defaults to
+    # gemini-3.5-flash but can be overridden via GEMINI_MODEL_ID.
     # SecretStr so the value cannot reach a repr, log line, or validation error.
     gemini_api_key: SecretStr = SecretStr("")
     gemini_model_id: str = ""
-
-    # -- AWS Strands Agents (Agents for Humans hackathon) ---------------------
-    # Off by default so existing Gemini / mock New Run paths stay unchanged.
-    # When true, POST /api/runs is coordinated by a Strands Agent that calls
-    # existing run_manager tools (AgentController + Playwright stay intact).
-    use_strands_orchestration: bool = Field(default=False, env="USE_STRANDS_ORCHESTRATION")
-    strands_model_id: str = Field(default="", env="STRANDS_MODEL_ID")
-
-    # -- Amazon Bedrock (GEMMA_PROVIDER=bedrock) ------------------------------
-    # Deliberately separate from the gemma_* names above rather than reusing
-    # them: a Bedrock model id and an Ollama model tag look nothing alike, and
-    # silently feeding GEMMA_MODEL_ID to Bedrock would produce a confusing
-    # ValidationException instead of an actionable "BEDROCK_MODEL_ID is not
-    # configured". Read through the `effective_bedrock_*` properties.
-    aws_region: str = ""
-    # SecretStr so the value cannot reach a repr, a log line, a pydantic
-    # validation error, or an accidental `print(settings)`. The provider reads
-    # it through `effective_bedrock_bearer_token`; everything else that needs to
-    # know whether auth exists asks `bedrock_auth_configured`, which is a bool.
-    aws_bearer_token_bedrock: SecretStr = SecretStr("")
-    bedrock_model_id: str = ""
-    # Maps to botocore's retries={"max_attempts": N}. Distinct from
-    # gemma_max_consecutive_failures, which counts failures ACROSS calls before
-    # the run stops making model-driven decisions at all.
-    bedrock_max_retries: int = 3
-    bedrock_connect_timeout: float = 10.0
-    # None means "inherit GEMMA_TIMEOUT_SECONDS", so the existing timeout knob
-    # keeps governing unless Bedrock is given its own.
-    bedrock_read_timeout: float | None = None
 
     # Browser adapter: direct_playwright | playwright_mcp
     browser_adapter: str = "direct_playwright"
@@ -284,43 +251,6 @@ class Settings(BaseSettings):
         return [s.strip() for s in (self.gemma_stop_sequences or "").split(",") if s.strip()]
 
     @property
-    def effective_bedrock_model_id(self) -> str:
-        """BEDROCK_MODEL_ID only — never a fallback to GEMMA_MODEL_ID.
-
-        The absence of a fallback is the feature. A provider that quietly used a
-        model id meant for a different backend would fail deep inside the AWS
-        SDK with a ValidationException about an unrecognised model, instead of
-        saying which environment variable is missing.
-        """
-        return (self.bedrock_model_id or "").strip()
-
-    @property
-    def effective_bedrock_read_timeout(self) -> float:
-        """Bedrock's own read timeout, or the existing global one."""
-        if self.bedrock_read_timeout is not None:
-            return float(self.bedrock_read_timeout)
-        return float(self.gemma_timeout_seconds)
-
-    @property
-    def bedrock_auth_configured(self) -> bool:
-        """Whether a bearer token was supplied — the only auth question anything
-        outside the provider is allowed to ask.
-
-        Health responses and log lines call this instead of touching the token,
-        so there is no code path where a caller has to remember to mask it.
-        """
-        return bool(self.aws_bearer_token_bedrock.get_secret_value().strip())
-
-    @property
-    def effective_bedrock_bearer_token(self) -> str:
-        """The raw token, for the Bedrock provider's client construction only.
-
-        The single place the secret is unwrapped. Callers must not log, echo, or
-        put the return value in an error message.
-        """
-        return self.aws_bearer_token_bedrock.get_secret_value().strip()
-
-    @property
     def effective_gemini_api_key(self) -> str:
         """The Gemini API key for the Gemini provider only.
         
@@ -395,11 +325,6 @@ class Settings(BaseSettings):
         if self.debug:
             return False
         return self.require_https_credentials
-
-    @property
-    def effective_strands_model_id(self) -> str:
-        """STRANDS_MODEL_ID, else BEDROCK_MODEL_ID. Empty means not configured."""
-        return (self.strands_model_id or self.bedrock_model_id or "").strip()
 
     @property
     def extra_blocked_patterns(self) -> tuple[str, ...]:

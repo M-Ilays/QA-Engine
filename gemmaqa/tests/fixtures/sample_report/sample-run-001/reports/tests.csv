@@ -1,3 +1,3 @@
-test_id,title,description,category,priority,preconditions,steps,expected_results,related_workflow_id
-tc-001,Login with valid credentials,,smoke,medium,,Open login | Submit form,Dashboard loads,
-tc-002,Search inventory,,functional,medium,,Open inventory | Search,Results table updates,
+test_case_id,description,test_data,test_steps,expected_result,actual_result,execution_status,result,category,priority
+TC_LOGIN_POS_001,Login with valid credentials,,Open login | Submit form,Dashboard loads,The application responded as expected — test passed.,Executed,Pass,smoke,medium
+TC_SEARCH_POS_001,Search inventory,,Open inventory | Search,Results table updates,The application did not respond as expected — test failed.,Executed,Fail,functional,medium

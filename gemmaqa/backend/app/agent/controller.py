@@ -273,6 +273,67 @@ class AgentController:
             paused += (_utc_now() - self._pause_started_at).total_seconds()
         return max(0.0, elapsed - paused)
 
+    def _is_form_submission_url_change(
+        self,
+        *,
+        action: "BrowserAction",
+        result: "ActionResult",
+        before_url: str | None,
+    ) -> bool:
+        """Return True when a scoped run just completed a form submission
+        that caused a URL change — a reliable signal that the targeted
+        feature (e.g. signup, login) has completed its happy path.
+
+        Conditions (ALL must be true):
+        1. The operator set a scoped testing objective (named modules).
+        2. The current action was a CLICK (button/submit press).
+        3. The action succeeded.
+        4. The URL changed (before_url != after_url).
+        5. At least one FILL action preceded this CLICK recently
+           (confirms it was a form submission, not plain navigation).
+        6. Authentication is not still in progress (avoid stopping mid-login).
+        """
+        # 1. Scoped objective?
+        objective: str = getattr(self.config, "testing_objective", None) or ""
+        scoped_markers = [
+            "ONLY test",
+            "strictly limited to",
+            "do NOT navigate to any other",
+            "call FINISH immediately",
+        ]
+        if not any(m.lower() in objective.lower() for m in scoped_markers):
+            return False
+
+        # 2 & 3. Successful CLICK?
+        if action.action != ActionType.CLICK or not result.success:
+            return False
+
+        # 4. URL actually changed?
+        after_url = result.after_url or ""
+        if not before_url or not after_url:
+            return False
+        # Normalise: ignore trailing slash differences
+        if before_url.rstrip("/") == after_url.rstrip("/"):
+            return False
+
+        # 5. Recent FILL actions (within last 10 actions)?
+        # memory.actions stores ActionResult objects; ActionResult.action is a
+        # BrowserAction whose .action attribute is the ActionType enum value.
+        recent_results = list(self.memory.actions)[-10:]
+        had_fill = any(
+            getattr(getattr(r, "action", None), "action", None) == ActionType.FILL
+            for r in recent_results
+        )
+        if not had_fill:
+            return False
+
+        # 6. Auth not still in progress?
+        auth = self.memory.auth_strategy
+        if auth is not None and not self.memory.authenticated:
+            return False
+
+        return True
+
     async def _wait_if_paused(self) -> None:
         """Block the loop at a safe checkpoint. Time spent here is not billed."""
         if self._run_gate.is_set() or self._cancel.is_set():
@@ -794,6 +855,9 @@ class AgentController:
                     # per new page is what operators see as "waiting" after load,
                     # signup, and add-contact. Do not block the live loop on it.
                     skip_llm=True,
+                    focus_modules=list(getattr(self.config, "focus_modules", None) or []),
+                    test_case_types=list(getattr(self.config, "test_case_types", None) or []),
+                    testing_objective=self.config.testing_objective,
                 )
                 self.memory.scenarios = self.tester.scenarios
                 self.memory.executions = self.tester.executions
@@ -1122,6 +1186,32 @@ class AgentController:
                 self._run_qa_strategy()
                 self._run_autonomous_investigation(before_state=page_state, after_state=after_state, action=action, result=result)
                 self._record_state_transition(action=action, result=result)
+
+                # ── URL-change task-completion detector ──────────────────────
+                # When the operator set a scoped objective (specific module to
+                # test), a URL change after a form submission is a strong signal
+                # that the feature under test has completed its happy path.
+                # Signal: CLICK action succeeded + URL changed + recent FILLs
+                # This lets the agent stop naturally based on real outcomes
+                # rather than action counts or time limits.
+                if self._is_form_submission_url_change(
+                    action=action,
+                    result=result,
+                    before_url=page_state.url if page_state else None,
+                ):
+                    self.memory.stop_reason = "task_objective_achieved"
+                    await self.emit(
+                        "run_stopping",
+                        {
+                            "reason": self.memory.stop_reason,
+                            "detail": (
+                                f"URL changed from {page_state.url!r} "
+                                f"to {result.after_url!r} after form submission — "
+                                "scoped task objective achieved."
+                            ),
+                        },
+                    )
+                    break
 
                 if self.memory.auth_strategy:
                     auth = self.memory.auth_strategy

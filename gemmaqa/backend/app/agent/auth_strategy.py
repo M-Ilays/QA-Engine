@@ -709,6 +709,25 @@ class AuthenticationStrategy:
         method: str,
     ) -> list[BrowserAction]:
         steps: list[BrowserAction] = []
+        if method == "registration" and form.submit_element_id:
+            steps.append(
+                BrowserAction(
+                    action=ActionType.CLICK,
+                    element_id=form.submit_element_id,
+                    reason="Submit signup before entering data to verify validation messages",
+                    expected_result="A validation message is displayed for empty required fields.",
+                    risk=RiskLevel.LOW,
+                    category=ActionCategory.NEGATIVE_TEST,
+                    metadata={
+                        "auth_write": True,
+                        "form_id": form.form_id,
+                        "auth_method": method,
+                        "validation_probe": True,
+                        "operation": "signup",
+                        "action_label": "Submit signup to check validation",
+                    },
+                )
+            )
         desc = next((f for f in (page.forms or []) if f.form_id == form.form_id), None)
         fields = list(desc.fields) if desc else []
         auth_trace(
@@ -804,6 +823,7 @@ class AuthenticationStrategy:
                         "form_id": form.form_id,
                         "auth_method": method,
                         "auth_submit": True,
+                        "operation": "signup" if method == "registration" else "login",
                         "action_label": "Submit authentication form",
                     },
                 )

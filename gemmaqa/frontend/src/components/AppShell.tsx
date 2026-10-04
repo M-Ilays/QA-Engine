@@ -6,6 +6,7 @@ import { ProviderSwitcher } from "./ProviderSwitcher";
 
 const nav = [
   { to: "/", label: "Home", end: true },
+  { to: "/chat", label: "💬 Chat" },
   { to: "/runs/new", label: "New Run" },
   { to: "/history", label: "History" },
   { to: "/settings", label: "Settings" },

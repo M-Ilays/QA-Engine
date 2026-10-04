@@ -1,6 +1,6 @@
 """Implemented LLM catalog for UI switching.
 
-Config checks only — never probes a live model (Bedrock quota, Gemini billing).
+Config checks only — never probes a live model (Gemini billing).
 Secrets never appear in catalog payloads.
 """
 
@@ -54,11 +54,6 @@ PROVIDER_CATALOG: tuple[ProviderSpec, ...] = (
         description="Google AI Studio / Gemini API.",
     ),
     ProviderSpec(
-        id="bedrock",
-        label="Amazon Bedrock",
-        description="AWS Bedrock (Nova, Claude, Llama, and others).",
-    ),
-    ProviderSpec(
         id="transformers",
         label="Gemma (Transformers)",
         description="Local Hugging Face transformers weights.",
@@ -88,23 +83,6 @@ def _configured_for(provider_id: str) -> tuple[bool, str, str | None]:
         if settings.effective_gemini_api_key:
             return True, "GEMINI_API_KEY is set", model
         return False, "Set GEMINI_API_KEY in backend .env", model
-
-    if provider_id == "bedrock":
-        model = settings.effective_bedrock_model_id or None
-        region = (settings.aws_region or "").strip()
-        if region and model:
-            auth_note = (
-                "Bedrock API key is set"
-                if settings.bedrock_auth_configured
-                else "No Bedrock API key; will use the AWS credential chain"
-            )
-            return True, f"Region {region}. {auth_note}", model
-        missing: list[str] = []
-        if not region:
-            missing.append("AWS_REGION")
-        if not model:
-            missing.append("BEDROCK_MODEL_ID")
-        return False, "Set " + " and ".join(missing) + " in backend .env", model
 
     if provider_id == "transformers":
         model = settings.effective_gemma_model_id or None

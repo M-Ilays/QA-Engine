@@ -16,13 +16,12 @@ Two layers, deliberately separate:
                                      reason, raw payload.
 
 They are NOT the same object under two names, and neither replaces the other.
-`GenerationRequest` keeps its meaning untouched; a call to Bedrock takes a
+`GenerationRequest` keeps its meaning untouched; a provider call takes a
 `GenerationRequest`'s prompts and carries them in a `ModelCallRequest`.
 
-Nothing here imports boto3, httpx or any SDK. This module is pure data, so it
-stays importable in an environment with no provider backends installed at all —
-the same property that lets `GEMMA_PROVIDER=mock` run without transformers or
-AWS present.
+Nothing here imports an SDK. This module is pure data, so it stays importable
+in an environment with no provider backends installed at all — the same
+property that lets `GEMMA_PROVIDER=mock` run without transformers.
 
 Two conventions inherited from the rest of the codebase, both load-bearing:
 
@@ -95,7 +94,7 @@ class ModelCallRequest:
 class ModelCallResult:
     """What a provider actually returned, normalized across providers.
 
-    Bedrock populates every field it is given by the service. The existing
+    A provider populates every field the service returns. The existing
     providers keep their `_generate() -> str` contract; where a normalized result
     is needed for one of them, `from_text` synthesises a minimal instance whose
     unknown fields are honestly `None` rather than plausible-looking zeros.

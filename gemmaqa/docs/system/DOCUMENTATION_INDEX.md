@@ -20,8 +20,6 @@ This suite lives at `docs/system/` and documents the GemmaQA system as it curren
 | [TECHNICAL_SYSTEM_DOCUMENTATION.md](TECHNICAL_SYSTEM_DOCUMENTATION.md) | Developers, architects | The deepest implementation-oriented document: repo map, tech stack, schemas, package-by-package detail, controller lifecycle, configuration reference, extension guide. |
 | [MODULE_AND_ENGINE_COMMUNICATION_FLOW.md](MODULE_AND_ENGINE_COMMUNICATION_FLOW.md) | Developers, architects, QA reviewers | The authoritative communication/pipeline document: component catalogue, every data/control flow, the semantic-step-to-browser-action mechanism, failure propagation, the 16-state investigation state machine, and verified communication invariants. |
 | DOCUMENTATION_INDEX.md (this file) | Everyone | Navigation, reading order, source-of-truth guidance, and audit limitations. |
-| [../BEDROCK_PROVIDER.md](../BEDROCK_PROVIDER.md) | Operators configuring a cloud model; developers adding a provider | The Amazon Bedrock provider: configuration, the verified authentication mechanism, request/response mapping, error vocabulary, health semantics, and how to add a further provider. |
-| [../BEDROCK_SMOKE_TEST.md](../BEDROCK_SMOKE_TEST.md) | Whoever runs the first live AWS call | Phased checklist closing the one gap the mocked tests cannot: no Bedrock request has yet left the machine. |
 
 ---
 

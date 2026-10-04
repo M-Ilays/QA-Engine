@@ -144,6 +144,10 @@ class RunConfiguration(BaseModel):
         max_length=2000,
         description="Operator's testing objective in their own words; null when not provided.",
     )
+    # Chat/settings: which test kinds to write. Default is happy-path only.
+    test_case_types: list[str] = Field(default_factory=lambda: ["positive"])
+    # Named modules/features the run must stay inside (e.g. ["signup"]).
+    focus_modules: list[str] = Field(default_factory=list)
 
 
 class CreateRunRequest(BaseModel):
@@ -562,9 +566,27 @@ class TestScenario(BaseModel):
     category: str = "exploratory"
     priority: str = "medium"
     preconditions: list[str] = Field(default_factory=list)
+    # Concrete test data used during execution (field values, credentials, etc.)
+    test_data: list[str] = Field(default_factory=list)
+    # Structured test data as a dict {"Field Label": "value"} for display / export
+    test_data_json: dict = Field(default_factory=dict)
     steps: list[str] = Field(default_factory=list)
     expected_results: list[str] = Field(default_factory=list)
     related_workflow_id: Optional[str] = None
+    # Internal execution state (used by the agent engine)
+    status: Literal["passed", "failed", "not_tested"] = "not_tested"
+    actual_result: str = ""
+    # Test case type: positive = happy path, negative = invalid inputs / error cases
+    test_case_type: Literal["positive", "negative", "exploratory"] = "positive"
+    # ── QA Report display fields ──────────────────────────────────────────────
+    # Human-readable ID: TC_SIGNUP_001, TC_LOGIN_001, etc.
+    friendly_id: str = ""
+    # Formatted test data string: "Field: Value\nField: Value"
+    test_data_formatted: str = ""
+    # Execution status for the report: "Executed" or "Not Executed"
+    execution_status: Literal["Executed", "Not Executed"] = "Not Executed"
+    # Pass/Fail result — only set when execution_status == "Executed"
+    result: Literal["Pass", "Fail", "N/A"] = "N/A"
 
 
 class TestExecution(BaseModel):

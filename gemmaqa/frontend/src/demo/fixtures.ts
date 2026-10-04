@@ -13,7 +13,6 @@ import type {
   PageItem,
   ProviderCatalog,
   RunStatus,
-  StrandsStatus,
   WSEvent,
 } from "../types";
 
@@ -195,8 +194,11 @@ export const demoReport: FinalReport = {
       category: "smoke",
       priority: "high",
       preconditions: ["Valid demo account"],
+      test_data: ["user@example.com", "password123"],
       steps: ["Open login", "Submit form"],
       expected_results: ["Dashboard loads"],
+      status: "passed" as const,
+      actual_result: "Dashboard loaded successfully",
     },
     {
       test_id: "tc-002",
@@ -205,8 +207,11 @@ export const demoReport: FinalReport = {
       category: "functional",
       priority: "medium",
       preconditions: ["Authenticated"],
+      test_data: [],
       steps: ["Open inventory", "Search"],
       expected_results: ["Results table updates"],
+      status: "not_tested" as const,
+      actual_result: "",
     },
   ],
   test_executions: [
@@ -445,15 +450,6 @@ const DEMO_PROVIDER_CATALOG: ProviderCatalog = {
       model_id: null,
     },
     {
-      id: "bedrock",
-      label: "Amazon Bedrock",
-      description: "AWS Bedrock (Nova, Claude, Llama, and others).",
-      configured: false,
-      selectable: false,
-      note: "Not available in demo mode.",
-      model_id: null,
-    },
-    {
       id: "transformers",
       label: "Gemma (Transformers)",
       description: "Local Hugging Face transformers weights.",
@@ -470,15 +466,6 @@ type DemoExportKind = "json" | "md" | "html" | "bugs.csv" | "tests.csv" | "navig
 
 export const demoApi = {
   health: async () => ({ status: "ok", app: "GemmaQA", version: "0.1.0-demo" }),
-  strandsStatus: async (): Promise<StrandsStatus | null> => ({
-    installed: false,
-    enabled: false,
-    configured: false,
-    ready: false,
-    model_id: null,
-    aws_region: null,
-    sdk: "strands-agents",
-  }),
   listProviders: async (): Promise<ProviderCatalog> => DEMO_PROVIDER_CATALOG,
   setProvider: async (_provider: string): Promise<ProviderCatalog> => {
     void _provider;
@@ -489,10 +476,7 @@ export const demoApi = {
     if (runId !== DEMO_RUN_ID) throw new Error("Demo mode only includes sample-run-001");
     return demoRun;
   },
-  createRun: async (
-    _body: CreateRunRequest,
-    _opts?: { strands?: boolean },
-  ): Promise<CreateRunResponse> => ({
+  createRun: async (_body: CreateRunRequest): Promise<CreateRunResponse> => ({
     run_id: DEMO_RUN_ID,
     status: "completed",
     message: "Demo mode — loaded fixture run (no live browser)",
@@ -517,6 +501,38 @@ export const demoApi = {
   getReport: async (_runId?: string) => demoReport,
   getReportMarkdown: async (_runId?: string) =>
     "# Demo GemmaQA Report\n\nThis is fixture documentation for hackathon demos.\n",
+  getTestCases: async (_runId?: string) => ({
+    test_cases: demoReport.test_scenarios.map((t, i) => {
+      const internal = t.status ?? "not_tested";
+      const execStatus  = internal === "passed" || internal === "failed" ? "Executed" : "Not Executed";
+      const result      = internal === "passed" ? "Pass" : internal === "failed" ? "Fail" : "N/A";
+      const tcType      = (internal === "passed" ? "positive" : "exploratory") as "positive" | "negative" | "exploratory";
+      // Build test_data_json from test_data list
+      const tdJson: Record<string, string> = {};
+      (t.test_data ?? []).forEach(entry => {
+        const idx = entry.indexOf(":");
+        if (idx > 0) { tdJson[entry.slice(0, idx).trim()] = entry.slice(idx + 1).trim(); }
+      });
+      const tdFormatted = (t.test_data ?? []).join("\n");
+      return {
+        test_case_id:     `TC_DEMO_POS_${String(i + 1).padStart(3, "0")}`,
+        test_case_type:   tcType,
+        title:            t.title,
+        description:      t.description,
+        test_data:        tdFormatted || "",
+        test_data_json:   tdJson,
+        execution_status: execStatus as "Executed" | "Not Executed",
+        result:           result as "Pass" | "Fail" | "N/A",
+        category:         t.category,
+        priority:         t.priority,
+        preconditions:    t.preconditions,
+        test_steps:       t.steps,
+        expected_result:  t.expected_results,
+        actual_result:    t.actual_result ?? "",
+      };
+    }),
+    total: demoReport.test_scenarios.length,
+  }),
   getEvidence: async (_runId?: string) => demoEvidence,
   getNavigationMermaid: async (_runId?: string) => demoReport.navigation_structure,
   evidenceFileUrl: (_runId: string, _path: string) => PLACEHOLDER_SVG,

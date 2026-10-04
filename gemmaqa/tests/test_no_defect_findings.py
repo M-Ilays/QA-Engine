@@ -1,6 +1,6 @@
 """A model reporting "nothing is wrong" must not produce a defect.
 
-Live on Bedrock/Nova Pro, run 47704fde: **27 of 32 recorded "defects" were the
+Live on a cloud model, run 47704fde: **27 of 32 recorded "defects" were the
 model saying there was no defect** — titles like "No defects detected on the
 login page", severity minor, one per action. The report's bug count was
 meaningless.

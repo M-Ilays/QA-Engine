@@ -270,6 +270,8 @@ def test_an_update_costs_two_actions():
         action = wf.next_action()
         if action is None:
             break
+        if (action.metadata or {}).get("validation_probe"):
+            continue
         actions.append(action.action.value)
         if action.action.value == "click":
             break

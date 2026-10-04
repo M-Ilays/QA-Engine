@@ -2,7 +2,7 @@
 
 **Run ID:** `sample-run-001`  
 **Target:** `https://demo.gemmaqa.local/`  
-**Generated:** 2026-08-31T12:14:33.284051  
+**Generated:** 2026-10-04T12:53:18.501292  
 
 ## Executive Summary
 
@@ -87,8 +87,8 @@ flowchart TD
 
 | Form ID | Page URL | Fields | Method |
 | --- | --- | --- | --- |
-| 56f308a0-f896-4ab0-88d2-d865f5a55887 | https://demo.gemmaqa.local/login | 2 | POST |
-| 94b25886-2c2d-45c4-af8b-362421d583db | https://demo.gemmaqa.local/inventory | 1 | GET |
+| ba95aee3-6861-4564-8387-47c7aaaf9423 | https://demo.gemmaqa.local/login | 2 | POST |
+| 313660e8-4f3a-4ea4-aae5-00308b1c88e7 | https://demo.gemmaqa.local/inventory | 1 | GET |
 
 ## Form Lifecycle
 
@@ -199,7 +199,7 @@ _Every generated scenario reached a terminal executed outcome._
 ## Suspected Bugs
 
 **Console TypeError on login**
-- **Bug ID:** `analysis-4754888`
+- **Bug ID:** `analysis-7068568`
 - **Module:** Authentication
 - **Page / URL:** n/a / `https://demo.gemmaqa.local/login`
 - **Classification:** suspected_bug

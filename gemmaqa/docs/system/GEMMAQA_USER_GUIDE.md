@@ -154,8 +154,8 @@ This installs FastAPI, Playwright, Pydantic, SQLAlchemy, and the other packages 
 Optional provider backends are deliberately **not** in that file, so a default install stays lean. Install one only if you intend to use it:
 
 ```bash
-# GEMMA_PROVIDER=bedrock (Amazon Bedrock)
-pip install -r requirements-bedrock.txt
+# GEMMA_PROVIDER=gemini (Google Gemini)
+pip install -r requirements-gemini.txt
 ```
 
 Each provider imports its SDK lazily, so leaving these uninstalled does not affect `mock`, `openai_compatible`, or the rest of the application.

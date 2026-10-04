@@ -116,3 +116,76 @@ class EventRecord(Base):
     sequence_number: Mapped[int] = mapped_column(Integer, default=0)
     payload_json: Mapped[str] = mapped_column(Text, default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ChatConversation(Base):
+    """A chat conversation session with the QA agent."""
+    
+    __tablename__ = "chat_conversations"
+    
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="active")  # active, archived, deleted
+    target_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    context_json: Mapped[str] = mapped_column(Text, default="{}")  # Stores conversation memory
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ChatMessage(Base):
+    """Individual message in a chat conversation."""
+    
+    __tablename__ = "chat_messages"
+    
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    conversation_id: Mapped[str] = mapped_column(String(36), index=True)
+    role: Mapped[str] = mapped_column(String(32))  # user, assistant, system
+    content: Mapped[str] = mapped_column(Text)
+    intent_json: Mapped[str | None] = mapped_column(Text, nullable=True)  # Parsed user instruction
+    run_id: Mapped[str | None] = mapped_column(String(36), nullable=True)  # Associated QA run
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ConversationContext:
+    """Manages conversation context and memory across messages."""
+    
+    def __init__(self):
+        self.target_url: str | None = None
+        self.tested_modules: list[str] = []
+        self.discovered_features: dict[str, list[str]] = {}
+        self.previous_findings: list[dict] = []
+        self.user_preferences: dict = {}
+        self.active_run_id: str | None = None
+        
+    def to_dict(self) -> dict:
+        return {
+            "target_url": self.target_url,
+            "tested_modules": self.tested_modules,
+            "discovered_features": self.discovered_features,
+            "previous_findings": self.previous_findings,
+            "user_preferences": self.user_preferences,
+            "active_run_id": self.active_run_id,
+        }
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> "ConversationContext":
+        ctx = cls()
+        ctx.target_url = data.get("target_url")
+        ctx.tested_modules = data.get("tested_modules", [])
+        ctx.discovered_features = data.get("discovered_features", {})
+        ctx.previous_findings = data.get("previous_findings", [])
+        ctx.user_preferences = data.get("user_preferences", {})
+        ctx.active_run_id = data.get("active_run_id")
+        return ctx
+    
+    def update_from_run(self, run_result: dict):
+        """Update context based on QA run results."""
+        if "modules_tested" in run_result:
+            self.tested_modules.extend(run_result["modules_tested"])
+        if "features_discovered" in run_result:
+            for module, features in run_result["features_discovered"].items():
+                if module not in self.discovered_features:
+                    self.discovered_features[module] = []
+                self.discovered_features[module].extend(features)
+        if "findings" in run_result:
+            self.previous_findings.append(run_result["findings"])

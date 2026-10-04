@@ -3,8 +3,6 @@ import { env } from "../config/env";
 import { api } from "../services/api";
 import { DemoBadge } from "../components/DemoBadge";
 import { ProviderSwitcher } from "../components/ProviderSwitcher";
-import type { StrandsStatus } from "../types";
-
 type Theme = "dark" | "light";
 
 export function SettingsPage() {
@@ -12,7 +10,6 @@ export function SettingsPage() {
     return (localStorage.getItem("gemmaqa.theme") as Theme) || "dark";
   });
   const [health, setHealth] = useState<string>("…");
-  const [strands, setStrands] = useState<StrandsStatus | null>(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -24,10 +21,6 @@ export function SettingsPage() {
       .health()
       .then((h) => setHealth(`${h.app} ${h.version} · ${h.status}`))
       .catch(() => setHealth(env.demoMode ? "Demo mode (no backend required)" : "Unreachable"));
-    api
-      .strandsStatus()
-      .then((status) => setStrands(status))
-      .catch(() => setStrands(null));
   }, []);
 
   return (
@@ -63,26 +56,6 @@ export function SettingsPage() {
           registered in the backend catalog. Secrets stay in <code className="text-slate-300">.env</code>.
         </p>
         <ProviderSwitcher variant="settings" />
-      </section>
-
-      <section className="surface space-y-3 p-6">
-        <h2 className="text-sm font-medium text-slate-200">AWS Strands coordinator</h2>
-        <p className="text-xs text-slate-500">
-          Official <code className="text-slate-300">strands-agents</code> SDK. It launches the run;
-          the Model dropdown still does page-by-page QA reasoning. Turn it on from New Run.
-        </p>
-        <dl className="space-y-2 text-sm">
-          <Row label="SDK" value={strands?.sdk || "strands-agents"} />
-          <Row label="Installed" value={strands?.installed ? "yes" : "no"} />
-          <Row
-            label="Configured"
-            value={
-              strands?.configured
-                ? `${strands.model_id || "model"} · ${strands.aws_region || "region"}`
-                : "needs AWS_REGION + BEDROCK_MODEL_ID"
-            }
-          />
-        </dl>
       </section>
 
       <section className="surface space-y-3 p-6">

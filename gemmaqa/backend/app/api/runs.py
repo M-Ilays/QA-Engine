@@ -13,6 +13,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.controller import ACTIVE_RUNS
+from app.agent.executed_cases import cases_from_actions, cases_to_csv
+from app.agent.test_scope import case_matches_request, focus_terms, requested_types
 from app.agent.events import event_store
 from app.agent.run_manager import run_manager
 from app.config import get_settings
@@ -20,11 +22,13 @@ from app.database import get_db
 from app.models import ActionRecord, BugRecord, EventRecord, PageRecord, QARun
 from app.reporting import service as report_service
 from app.reporting.exporters import ReportExporter
+from app.reporting.report_builder import merge_persisted_bugs
 from app.schemas import (
     CreateRunRequest,
     CreateRunResponse,
     DeleteRunResponse,
     ExecutionPacingUpdate,
+    FinalReport,
     PaginatedRuns,
     RunConfiguration,
     RunEvent,
@@ -88,9 +92,6 @@ async def create_run(
 ) -> CreateRunResponse:
     """Create a prepared QA run. Optionally auto-start when payload.auto_start is true."""
     payload = _validate_create_payload(payload)
-    if get_settings().use_strands_orchestration:
-        return await _create_run_via_strands(payload)
-
     run_id = await run_manager.create_run(payload, db)
 
     if payload.auto_start:
@@ -113,44 +114,6 @@ async def create_run(
         run_id=run_id,
         status=RunStatusEnum.CREATED,
         message="Run created — call POST /api/runs/{run_id}/start to begin",
-    )
-
-
-@router.post("/strands", response_model=CreateRunResponse, status_code=status.HTTP_201_CREATED)
-async def create_run_with_strands(payload: CreateRunRequest) -> CreateRunResponse:
-    """Coordinate a New Run with the AWS Strands Agents SDK.
-
-    Existing AgentController + Playwright still execute the browser work.
-    Requires Amazon Bedrock config (AWS_REGION + STRANDS_MODEL_ID or BEDROCK_MODEL_ID).
-    """
-    payload = _validate_create_payload(payload)
-    return await _create_run_via_strands(payload, require_enabled_flag=False)
-
-
-async def _create_run_via_strands(
-    payload: CreateRunRequest,
-    *,
-    require_enabled_flag: bool = True,
-) -> CreateRunResponse:
-    from app.strands_agent.service import run_with_strands_agent
-
-    try:
-        result = await run_with_strands_agent(
-            payload,
-            require_enabled_flag=require_enabled_flag,
-        )
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    run_id = result.get("run_id")
-    if not run_id:
-        raise HTTPException(
-            status_code=502,
-            detail=result.get("message") or "Strands Agent did not launch a run",
-        )
-    return CreateRunResponse(
-        run_id=run_id,
-        status=RunStatusEnum.INITIALIZING,
-        message=str(result.get("message") or "Strands Agent launched the QA run"),
     )
 
 
@@ -516,45 +479,255 @@ async def get_run_actions(run_id: str, db: AsyncSession = Depends(get_db)) -> li
     ]
 
 
+def _bug_api_item(
+    *,
+    bug_id: str,
+    title: str,
+    description: str,
+    severity: str,
+    status: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    return sanitize_dict(
+        {
+            "id": bug_id,
+            "title": title,
+            "description": description,
+            "severity": severity,
+            "status": status,
+            "payload": payload,
+        }
+    )
+
+
+async def _stored_bugs(db: AsyncSession, run_id: str) -> list[BugRecord]:
+    result = await db.execute(select(BugRecord).where(BugRecord.run_id == run_id))
+    return list(result.scalars().all())
+
+
 @router.get("/{run_id}/bugs")
 async def get_run_bugs(run_id: str, db: AsyncSession = Depends(get_db)) -> list[dict[str, Any]]:
+    """Every recorded bug, including ones the live report collapsed by title."""
     await _get_run_or_404(db, run_id)
-    controller = ACTIVE_RUNS.get(run_id)
-    if controller and controller.memory.bugs:
-        return [
-            sanitize_dict(
-                {
-                    "id": b.bug_id,
-                    "title": b.title,
-                    "description": b.description,
-                    "severity": b.severity.value,
-                    "status": b.status.value,
-                    "payload": b.model_dump(mode="json"),
-                }
-            )
-            for b in controller.memory.bugs
-        ]
-    result = await db.execute(select(BugRecord).where(BugRecord.run_id == run_id))
-    bugs = result.scalars().all()
-    out = []
-    for b in bugs:
+    by_id: dict[str, dict[str, Any]] = {}
+    for record in await _stored_bugs(db, run_id):
         try:
-            payload = json.loads(b.payload_json or "{}")
+            payload = json.loads(record.payload_json or "{}")
         except json.JSONDecodeError:
             payload = {}
-        out.append(
-            sanitize_dict(
-                {
-                    "id": b.id,
-                    "title": b.title,
-                    "description": b.description,
-                    "severity": b.severity,
-                    "status": b.status,
-                    "payload": payload,
-                }
-            )
+        by_id[record.id] = _bug_api_item(
+            bug_id=record.id,
+            title=record.title,
+            description=record.description,
+            severity=record.severity,
+            status=record.status,
+            payload=payload if isinstance(payload, dict) else {},
         )
-    return out
+    controller = ACTIVE_RUNS.get(run_id)
+    if controller is not None:
+        for bug in controller.memory.bugs:
+            if bug.bug_id in by_id:
+                continue
+            by_id[bug.bug_id] = _bug_api_item(
+                bug_id=bug.bug_id,
+                title=bug.title,
+                description=bug.description,
+                severity=bug.severity.value,
+                status=bug.status.value,
+                payload=bug.model_dump(mode="json"),
+            )
+    return list(by_id.values())
+
+
+@router.get("/{run_id}/test-cases")
+async def get_run_test_cases(run_id: str, db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+    """Return structured test cases in the standardised QA format.
+
+    Every test case has:
+      test_case_id   – human-readable ID (TC_SIGNUP_001)
+      description    – what the test validates
+      test_data      – actual input values used (field: value lines)
+      execution_status – "Executed" or "Not Executed"
+      result         – "Pass", "Fail", or "N/A"
+      test_case_type – positive / negative / exploratory
+    """
+    run = await _get_run_or_404(db, run_id)
+    report = report_service.build_from_live_memory(run_id)
+
+    def _request_filters(objective: str = "", config: dict | None = None) -> tuple[str, list[str], list[str]]:
+        cfg = config or {}
+        obj = objective or cfg.get("testing_objective") or ""
+        focus = list(cfg.get("focus_modules") or []) or focus_terms(obj)
+        types = list(cfg.get("test_case_types") or []) or requested_types(obj)
+        return obj, focus, types
+
+    def _run_config() -> dict:
+        try:
+            return json.loads(run.config_json or "{}") or {}
+        except json.JSONDecodeError:
+            return {}
+
+    def _keep_case(tc: dict, objective: str, focus: list[str], types: list[str]) -> bool:
+        return case_matches_request(
+            title=tc.get("title", ""),
+            description=tc.get("description", ""),
+            category=tc.get("category", ""),
+            test_case_type=tc.get("test_case_type", ""),
+            objective=objective,
+            focus_modules=focus,
+            test_case_types=types,
+        )
+
+    async def _executed_or_none(objective: str, focus: list[str], types: list[str]) -> list[dict] | None:
+        """Scoped runs show the submission that ran, not the page catalog."""
+        if not focus and not focus_terms(objective):
+            return None
+        rows = await db.execute(
+            select(ActionRecord)
+            .where(ActionRecord.run_id == run_id)
+            .order_by(ActionRecord.created_at)
+        )
+        payloads = [row.payload_json for row in rows.scalars().all()]
+        return cases_from_actions(
+            payloads,
+            objective=objective,
+            focus_modules=focus,
+            test_case_types=types,
+        )
+
+    def _normalise_dict_scenario(s: dict, exec_map: dict) -> dict:
+        """Normalise a raw dict scenario (from persisted JSON) to the QA format."""
+        tid = s.get("test_id") or s.get("test_case_id", "")
+        raw_exec = exec_map.get(tid, "not_run")
+        if raw_exec == "passed":
+            internal = "passed"
+        elif raw_exec in ("failed", "blocked"):
+            internal = "failed"
+        else:
+            internal = s.get("status", "not_tested")
+
+        if internal == "passed":
+            exec_status = "Executed"
+            result = "Pass"
+        elif internal == "failed":
+            exec_status = "Executed"
+            result = "Fail"
+        else:
+            exec_status = "Not Executed"
+            result = "N/A"
+
+        # Test data
+        td = s.get("test_data_formatted") or ""
+        if not td:
+            td_json = s.get("test_data_json") or {}
+            if isinstance(td_json, dict) and td_json:
+                td = "\n".join(f"{k}: {v}" for k, v in td_json.items())
+        if not td:
+            raw = s.get("test_data") or []
+            td = "\n".join(raw) if isinstance(raw, list) and raw else ""
+
+        return {
+            "test_case_id": s.get("friendly_id") or tid,
+            "test_case_type": s.get("test_case_type", "positive"),
+            "title": s.get("title", ""),
+            "description": s.get("description") or s.get("title", ""),
+            "test_data": td,
+            "test_data_json": s.get("test_data_json") or {},
+            "execution_status": exec_status,
+            "result": result,
+            # Extra detail kept for the expandable panel
+            "category": s.get("category", ""),
+            "priority": s.get("priority", "medium"),
+            "preconditions": s.get("preconditions") or [],
+            "test_steps": s.get("steps") or s.get("test_steps") or [],
+            "expected_result": s.get("expected_results") or s.get("expected_result") or [],
+            "actual_result": s.get("actual_result", ""),
+        }
+
+    if report is None:
+        data = report_service.load_report_dict(run_id, None)
+        if data is None:
+            raise HTTPException(status_code=404, detail="Report not available yet")
+        exec_map = {e["test_id"]: e["status"] for e in data.get("test_executions", [])}
+        cases = [_normalise_dict_scenario(s, exec_map) for s in data.get("test_scenarios", [])]
+        obj, focus, types = _request_filters(
+            data.get("testing_objective") or "",
+            _run_config(),
+        )
+        executed = await _executed_or_none(obj, focus, types)
+        if executed is not None:
+            return {"test_cases": executed, "total": len(executed)}
+        cases = [c for c in cases if _keep_case(c, obj, focus, types)]
+        return {"test_cases": cases, "total": len(cases)}
+
+    exec_status_map = {e.test_id: e.status for e in report.test_executions}
+
+    def _tc_dict(s) -> dict:
+        # Compute internal status from TestExecution records (primary source of truth)
+        raw_exec = exec_status_map.get(s.test_id, "not_run")
+        if raw_exec == "passed":
+            internal = "passed"
+        elif raw_exec in ("failed", "blocked"):
+            internal = "failed"
+        else:
+            # Fall back to the enriched status from report_builder
+            internal = getattr(s, "status", "not_tested")
+
+        # ALWAYS recompute execution_status and result from internal
+        # (never trust the cached field — it may have default "Not Executed")
+        if internal == "passed":
+            execution_status = "Executed"
+            result = "Pass"
+        elif internal == "failed":
+            execution_status = "Executed"
+            result = "Fail"
+        else:
+            execution_status = "Not Executed"
+            result = "N/A"
+
+        # Test data: prefer structured JSON, fall back to formatted string or list
+        td_json = getattr(s, "test_data_json", {}) or {}
+        td_formatted = getattr(s, "test_data_formatted", "") or ""
+        if not td_formatted and td_json:
+            td_formatted = "\n".join(f"{k}: {v}" for k, v in td_json.items())
+        if not td_formatted:
+            raw_list = getattr(s, "test_data", []) or []
+            td_formatted = "\n".join(raw_list) if raw_list else ""
+
+        # Friendly ID
+        tc_id = getattr(s, "friendly_id", "") or s.test_id
+
+        # Description quality
+        description = s.description or s.title or tc_id
+
+        return {
+            "test_case_id": tc_id,
+            "test_case_type": getattr(s, "test_case_type", "positive"),
+            "title": s.title,
+            "description": description,
+            "test_data": td_formatted,
+            "test_data_json": td_json,
+            "execution_status": execution_status,
+            "result": result,
+            # Detail panel fields
+            "category": s.category,
+            "priority": s.priority,
+            "preconditions": s.preconditions,
+            "test_steps": s.steps,
+            "expected_result": s.expected_results,
+            "actual_result": getattr(s, "actual_result", ""),
+        }
+
+    obj, focus, types = _request_filters(
+        getattr(report, "testing_objective", None) or "",
+        _run_config(),
+    )
+    executed = await _executed_or_none(obj, focus, types)
+    if executed is not None:
+        return {"test_cases": executed, "total": len(executed)}
+    cases = [_tc_dict(s) for s in report.test_scenarios]
+    cases = [c for c in cases if _keep_case(c, obj, focus, types)]
+    return {"test_cases": cases, "total": len(cases)}
 
 
 @router.get("/{run_id}/report")
@@ -565,7 +738,8 @@ async def get_run_report(run_id: str, db: AsyncSession = Depends(get_db)) -> dic
         report = report_service.build_from_live_memory(run_id)
         if report is None:
             raise HTTPException(status_code=404, detail="Report not available yet")
-        return sanitize_dict(report.model_dump(mode="json"))
+        data = report.model_dump(mode="json")
+    data = merge_persisted_bugs(data, await _stored_bugs(db, run_id))
     return sanitize_dict(data)
 
 
@@ -630,27 +804,55 @@ async def get_run_report_html(run_id: str, db: AsyncSession = Depends(get_db)) -
 @router.get("/{run_id}/bugs.csv")
 async def get_run_bugs_csv(run_id: str, db: AsyncSession = Depends(get_db)) -> Response:
     run = await _get_run_or_404(db, run_id)
-    path = report_service.find_artifact(run_id, "bugs.csv")
-    if path:
-        return Response(path.read_text(encoding="utf-8"), media_type="text/csv")
     report = report_service.load_report_model(run_id, run.report_json)
     if report is None:
         raise HTTPException(status_code=404, detail="Bug CSV not available yet")
+    data = merge_persisted_bugs(report.model_dump(mode="json"), await _stored_bugs(db, run_id))
+    merged = FinalReport.model_validate(data)
     exporter = ReportExporter(run_id)
-    return Response(exporter.export_bugs_csv(report).read_text(encoding="utf-8"), media_type="text/csv")
+    path = exporter.export_bugs_csv(merged)
+    headers = {"Content-Disposition": f'attachment; filename="bugs_{run_id[:8]}.csv"'}
+    return Response(path.read_text(encoding="utf-8"), media_type="text/csv", headers=headers)
 
 
 @router.get("/{run_id}/tests.csv")
 async def get_run_tests_csv(run_id: str, db: AsyncSession = Depends(get_db)) -> Response:
     run = await _get_run_or_404(db, run_id)
+    headers = {"Content-Disposition": f'attachment; filename="tests_{run_id[:8]}.csv"'}
+    try:
+        config = json.loads(run.config_json or "{}") or {}
+    except json.JSONDecodeError:
+        config = {}
+    report = report_service.build_from_live_memory(run_id) or report_service.load_report_model(
+        run_id, run.report_json
+    )
+    objective = ""
+    if report is not None:
+        objective = getattr(report, "testing_objective", None) or ""
+    objective = objective or config.get("testing_objective") or ""
+    focus = list(config.get("focus_modules") or []) or focus_terms(objective)
+    types = list(config.get("test_case_types") or []) or requested_types(objective)
+    if focus:
+        rows = await db.execute(
+            select(ActionRecord)
+            .where(ActionRecord.run_id == run_id)
+            .order_by(ActionRecord.created_at)
+        )
+        executed = cases_from_actions(
+            [row.payload_json for row in rows.scalars().all()],
+            objective=objective,
+            focus_modules=focus,
+            test_case_types=types,
+        )
+        if executed is not None:
+            return Response(cases_to_csv(executed), media_type="text/csv", headers=headers)
     path = report_service.find_artifact(run_id, "tests.csv")
     if path:
-        return Response(path.read_text(encoding="utf-8"), media_type="text/csv")
-    report = report_service.load_report_model(run_id, run.report_json)
+        return Response(path.read_text(encoding="utf-8"), media_type="text/csv", headers=headers)
     if report is None:
         raise HTTPException(status_code=404, detail="Tests CSV not available yet")
     exporter = ReportExporter(run_id)
-    return Response(exporter.export_tests_csv(report).read_text(encoding="utf-8"), media_type="text/csv")
+    return Response(exporter.export_tests_csv(report).read_text(encoding="utf-8"), media_type="text/csv", headers=headers)
 
 
 @router.get("/{run_id}/evidence")

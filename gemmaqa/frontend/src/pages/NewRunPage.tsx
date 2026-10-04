@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, env, parseApiError } from "../services/api";
-import type { CreateRunRequest, ProviderCatalog, StrandsStatus } from "../types";
+import type { CreateRunRequest, ProviderCatalog } from "../types";
 import { DemoBadge } from "../components/DemoBadge";
 import { PROVIDER_CHANGED_EVENT } from "../components/ProviderSwitcher";
 import { emptyRunForm, formFromPreviousRun, rememberSubmittedRun } from "../utils/runDraft";
@@ -16,8 +16,6 @@ export function NewRunPage() {
   const [error, setError] = useState<string | null>(null);
   const [reuseNote, setReuseNote] = useState<string | null>(null);
   const [providerLabel, setProviderLabel] = useState<string | null>(null);
-  const [strands, setStrands] = useState<StrandsStatus | null>(null);
-  const [useStrands, setUseStrands] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,16 +32,6 @@ export function NewRunPage() {
       if (detail) setProviderLabel(detail.active_label);
     }
     window.addEventListener(PROVIDER_CHANGED_EVENT, onChanged);
-    api
-      .strandsStatus()
-      .then((status) => {
-        if (cancelled || !status) return;
-        setStrands(status);
-        setUseStrands(Boolean(status.configured));
-      })
-      .catch(() => {
-        if (!cancelled) setStrands(null);
-      });
     return () => {
       cancelled = true;
       window.removeEventListener(PROVIDER_CHANGED_EVENT, onChanged);
@@ -111,7 +99,7 @@ export function NewRunPage() {
           testing_objective: form.configuration.testing_objective?.trim() || null,
         },
       };
-      const res = await api.createRun(payload, { strands: useStrands && Boolean(strands?.configured) });
+      const res = await api.createRun(payload);
       rememberSubmittedRun({ ...payload, password: passwordSnapshot });
       // Clear password from component state immediately after acceptance
       // Never write credentials to localStorage or sessionStorage
@@ -260,18 +248,6 @@ export function NewRunPage() {
             />
           </Field>
         </div>
-
-        <Toggle
-          label="Coordinate with AWS Strands"
-          hint={
-            strands?.configured
-              ? `Official Strands Agents SDK starts this run (Bedrock ${strands.model_id || "coordinator"}). The Model dropdown still does the page-by-page QA reasoning.`
-              : "Needs AWS_REGION and BEDROCK_MODEL_ID (or STRANDS_MODEL_ID). The browser engine is unchanged."
-          }
-          checked={useStrands && Boolean(strands?.configured)}
-          disabled={!strands?.configured || env.demoMode}
-          onChange={(v) => setUseStrands(v && Boolean(strands?.configured))}
-        />
 
         <div className="grid gap-3 sm:grid-cols-2">
           <Toggle

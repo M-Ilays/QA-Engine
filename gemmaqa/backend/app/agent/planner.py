@@ -99,6 +99,20 @@ class Planner:
             authenticated=bool(memory and memory.auth_strategy and memory.auth_strategy.authenticated),
         )
 
+        # ── Scoped auth-objective completion guard ────────────────────────
+        # When the user asked to test ONLY signup/login and the agent has
+        # now authenticated (registration/login completed), we are done.
+        # Force FINISH immediately so the agent never wanders to post-login
+        # pages (contact list, dashboard, etc.) that are outside the scope.
+        if self._scoped_auth_objective_complete(memory, context):
+            logger.info(
+                "Scoped auth objective (signup/login) complete — forcing FINISH"
+            )
+            return self._finish(
+                "Scoped signup/login objective achieved — authentication successful",
+                code="exploration_complete",
+            )
+
         # rank_goals is only a tie-break among competing exploration goals.
         # Skip it when the next action is already decided (in-flight workflow)
         # or when we are still on the login/signup path — auth/frontier picks
@@ -277,14 +291,23 @@ class Planner:
             action = self.plan_by_priority(page_state, memory, context)
 
         if memory and action.action == ActionType.FINISH:
-            alt = self.plan_by_priority(page_state, memory, context)
-            if alt.action != ActionType.FINISH:
+            # When the operator set a scoped objective (specific modules/features),
+            # trust the AI's FINISH decision — the agent has completed what was asked.
+            # Only override when running open-ended exploration (no specific scope).
+            if not self._is_scoped_objective(context):
+                alt = self.plan_by_priority(page_state, memory, context)
+                if alt.action != ActionType.FINISH:
+                    logger.info(
+                        "Overriding premature FINISH with deterministic action: %s",
+                        alt.action.value,
+                    )
+                    return self._avoid_exhausted_screenshot(
+                        alt, page_state, memory, context
+                    )
+            else:
                 logger.info(
-                    "Overriding premature FINISH with deterministic action: %s",
-                    alt.action.value,
-                )
-                return self._avoid_exhausted_screenshot(
-                    alt, page_state, memory, context
+                    "Scoped objective detected — honouring AI FINISH decision: %s",
+                    (action.reason or "")[:120],
                 )
 
         action = self._avoid_exhausted_screenshot(action, page_state, memory, context)
@@ -520,11 +543,19 @@ class Planner:
         converts to a real `BrowserAction` — exactly the same "try next on
         None" behavior as before, just over the PriorityEngine's order instead
         of a bare `(priority, ...)` sort."""
+        positive_only = self._is_positive_only_objective(context)
         rejected: list[dict[str, Any]] = list(decision.rejected)
         for cand in decision.ordered_candidates:
             if cand.status in {"exhausted", "blocked"}:
                 rejected.append(
                     {"candidate_id": cand.candidate_id, "candidate_type": cand.candidate_type, "reason": f"status={cand.status}"}
+                )
+                continue
+            # When positive-only mode is active, skip all negative-test candidates
+            # (empty-value fills, boundary checks, duplicate-name submissions).
+            if positive_only and getattr(cand, "category", "") == ActionCategory.NEGATIVE_TEST.value:
+                rejected.append(
+                    {"candidate_id": cand.candidate_id, "candidate_type": cand.candidate_type, "reason": "positive_only_mode"}
                 )
                 continue
             action = self._candidate_to_action(cand, page_state, memory, auth, context)
@@ -947,9 +978,11 @@ class Planner:
             if not context.get("safe_mode", True) or context.get(
                 "allow_safe_test_data_creation"
             ):
-                fill = self._safe_fill_candidate(page_state, memory)
-                if fill:
-                    return fill
+                # Skip empty-value negative-test fills in positive-only mode
+                if not self._is_positive_only_objective(context):
+                    fill = self._safe_fill_candidate(page_state, memory)
+                    if fill:
+                        return fill
 
         if memory.auth_strategy and not memory.auth_strategy.authenticated:
             blocker = memory.auth_strategy.unresolved_auth_blocker(
@@ -1119,6 +1152,79 @@ class Planner:
             "Screenshot budget exhausted and no other safe candidates remain",
             code="exploration_complete",
         )
+
+    @staticmethod
+    def _is_scoped_objective(context: dict) -> bool:
+        """Return True when the operator set a specific, bounded testing objective.
+
+        A scoped objective is one that targets named modules or features rather
+        than asking for open-ended exploration.  When scoped, the AI's own FINISH
+        decision should be respected without the priority-planner override —
+        overriding would cause the agent to leave the requested scope and explore
+        unrelated parts of the application.
+
+        Detection heuristic: the objective string contains the canonical marker
+        phrase inserted by the chat orchestrator for focused runs.
+        """
+        objective: str = (context or {}).get("testing_objective") or ""
+        if not objective:
+            return False
+        scoped_markers = [
+            "ONLY test",
+            "strictly limited to",
+            "do NOT navigate to any other",
+            "call FINISH immediately",
+        ]
+        return any(marker.lower() in objective.lower() for marker in scoped_markers)
+
+    @staticmethod
+    def _is_positive_only_objective(context: dict) -> bool:
+        """Return True when the operator requested positive/happy-path tests only.
+
+        Detected from the canonical marker inserted by the chat orchestrator.
+        When True, the planner suppresses all deterministic negative-test
+        candidates (empty-value fills, boundary checks) so the agent never
+        executes them — the testing_objective text alone is not enough because
+        the deterministic frontier builder generates those candidates
+        independently of the LLM instruction.
+        """
+        objective: str = (context or {}).get("testing_objective") or ""
+        positive_markers = [
+            "POSITIVE ONLY",
+            "positive/happy-path test cases only",
+            "Do NOT test error cases",
+        ]
+        return any(m.lower() in objective.lower() for m in positive_markers)
+
+    @staticmethod
+    def _scoped_auth_objective_complete(memory: "RunMemory | None", context: dict) -> bool:
+        """Return True when a scoped signup/login objective is satisfied.
+
+        When the user asked to test ONLY signup or login, the objective is
+        complete as soon as authentication finishes (the registration or login
+        workflow succeeded).  Without this guard, the agent would continue
+        exploring the post-login pages (contact list, dashboard, etc.) even
+        though they are outside the stated scope.
+
+        Only fires when:
+          - The objective is scoped (contains the canonical markers)
+          - The objective explicitly targets signup/register OR login
+          - Authentication has been confirmed in memory
+        """
+        if memory is None:
+            return False
+        if not Planner._is_scoped_objective(context):
+            return False
+        auth = getattr(memory, "auth_strategy", None)
+        if auth is None or not getattr(auth, "authenticated", False):
+            return False
+        objective: str = (context or {}).get("testing_objective") or ""
+        low = objective.lower()
+        auth_feature_terms = [
+            "signup", "sign up", "register", "registration", "create account",
+            "login", "log in", "sign in", "signin", "authenticate",
+        ]
+        return any(t in low for t in auth_feature_terms)
 
     def _finish(self, reason: str, *, code: str = "exploration_complete") -> BrowserAction:
         """`code` is the canonical, truthful stop-reason vocabulary the controller

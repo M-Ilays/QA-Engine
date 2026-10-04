@@ -12,8 +12,7 @@ pytest>=8.0.0
 pytest-asyncio>=0.24.0
 
 # Optional provider backends are NOT pinned here — install the one you use:
-#   GEMMA_PROVIDER=bedrock       pip install -r backend/requirements-bedrock.txt
-#   AWS Strands coordinator      pip install -r backend/requirements-strands.txt
+#   GEMMA_PROVIDER=gemini        pip install -r backend/requirements-gemini.txt
 #   GEMMA_PROVIDER=transformers  install torch + transformers yourself
 # Each provider imports its SDK lazily, so a mock or openai_compatible install
 # stays lean and needs none of them.

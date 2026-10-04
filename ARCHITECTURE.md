@@ -2,7 +2,7 @@
 
 ## System Overview
 
-GemmaQA is an autonomous QA testing agent for **QA and development teams**. It supports **exploratory testing**, **retesting** after a fix, and **regression** smoke passes on the same authorized web app. It is built with AWS Strands Agents SDK. The system uses a coordinator-executor pattern: a Strands agent orchestrates the run while Agent Controller handles browser automation. It does not replace a scripted regression suite or a full QA strategy.
+GemmaQA is an autonomous QA testing agent for **QA and development teams**. It supports **exploratory testing**, **retesting** after a fix, and **regression** smoke passes on the same authorized web app. The API starts an Agent Controller, which drives the browser. It does not replace a scripted regression suite or a full QA strategy.
 
 ---
 
@@ -29,27 +29,6 @@ GemmaQA is an autonomous QA testing agent for **QA and development teams**. It s
 │                      (Python, Port 8000)                         │
 │                                                                   │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │         Strands Coordinator Agent                         │  │
-│  │         (AWS Strands SDK + Amazon Bedrock)                │  │
-│  │                                                            │  │
-│  │  • Analyzes target application                            │  │
-│  │  • Plans QA testing strategy                              │  │
-│  │  • Coordinates test execution                             │  │
-│  │  • Makes high-level decisions                             │  │
-│  │  • Generates test reports                                 │  │
-│  │                                                            │  │
-│  │  Tools:                                                    │  │
-│  │   - launch_authorized_qa_run()                            │  │
-│  │   - inspect_qa_run_status()                               │  │
-│  │   - read_qa_activity_log()                                │  │
-│  │   - pause_authorized_qa_run()                             │  │
-│  │   - resume_authorized_qa_run()                            │  │
-│  │   - end_authorized_qa_run()                               │  │
-│  └─────────────────────────┬─────────────────────────────────┘  │
-│                            │                                      │
-│                            │ HTTP Tool Calls                      │
-│                            │                                      │
-│  ┌─────────────────────────▼─────────────────────────────────┐  │
 │  │              Agent Controller                             │  │
 │  │              (Page-by-Page QA Engine)                     │  │
 │  │                                                            │  │
@@ -110,7 +89,7 @@ GemmaQA is an autonomous QA testing agent for **QA and development teams**. It s
 - Create and configure QA runs
 - Real-time activity log streaming
 - Test report visualization
-- Provider selection (Bedrock, Gemini, Ollama)
+- Provider selection (Gemini, Ollama)
 
 **Communication:**
 - REST API calls to FastAPI backend
@@ -135,48 +114,12 @@ GemmaQA is an autonomous QA testing agent for **QA and development teams**. It s
 
 ---
 
-### 3. Strands Coordinator Agent
-
-**Technology Stack:**
-- AWS Strands Agents SDK
-- Amazon Bedrock (Nova models)
-- HTTP-based tools
-
-**Responsibilities:**
-1. **Strategic Planning**
-   - Analyze target application
-   - Define testing objectives
-   - Create test plan
-
-2. **Orchestration**
-   - Launch QA runs
-   - Monitor progress
-   - Handle errors
-   - Coordinate with Agent Controller
-
-3. **Decision Making**
-   - Determine when to pause/resume
-   - Decide when testing is complete
-   - Prioritize testing areas
-
-4. **Reporting**
-   - Aggregate findings
-   - Generate comprehensive reports
-   - Provide actionable insights
-
-**Key Design:**
-- Stateless HTTP tools for cloud deployment
-- Designed for Amazon Bedrock AgentCore Runtime
-- Production-ready architecture
-
----
-
-### 4. Agent Controller
+### 3. Agent Controller
 
 **Technology Stack:**
 - Python
 - Playwright
-- LLM integration (Bedrock/Gemini/Ollama)
+- LLM integration (Gemini/Ollama)
 
 **Core QA Loop:**
 
@@ -211,7 +154,7 @@ while not done:
 
 ---
 
-### 5. Browser Automation (Playwright)
+### 4. Browser Automation (Playwright)
 
 **Technology Stack:**
 - Playwright (Python)
@@ -236,11 +179,7 @@ User → Frontend → POST /api/runs → Backend
                                       ↓
                               Store run metadata
                                       ↓
-                         Launch Strands Coordinator
-                                      ↓
-                    Coordinator calls launch_authorized_qa_run()
-                                      ↓
-                              Agent Controller starts
+                         Start Agent Controller
                                       ↓
                               Playwright opens browser
                                       ↓
@@ -268,10 +207,6 @@ Display in activity log
 ```
 Agent Controller detects completion
     ↓
-Notify Strands Coordinator
-    ↓
-Coordinator calls end_authorized_qa_run()
-    ↓
 Generate final report
     ↓
 Store results
@@ -283,23 +218,14 @@ Frontend displays report
 
 ## Key Design Decisions
 
-### 1. Coordinator-Executor Pattern
+### 1. Agent Controller owns the run
 
 **Why:**
-- Separation of concerns (strategy vs. execution)
-- Strands agent focuses on high-level decisions
-- Agent Controller handles low-level browser automation
-- Enables independent scaling
+- One process observes, plans, and executes
+- The API starts that loop directly
+- Pause, resume, and end stay on the same run
 
-### 2. HTTP-Based Tools
-
-**Why:**
-- Cloud-ready architecture
-- Supports AgentCore Runtime deployment
-- Backend can run separately from coordinator
-- Enables distributed deployment
-
-### 3. Stateless Operations
+### 2. Stateless Operations
 
 **Why:**
 - Scalability
@@ -307,13 +233,12 @@ Frontend displays report
 - Easy to deploy on serverless platforms
 - No complex state management
 
-### 4. Multi-Provider LLM Support
+### 3. Multi-Provider LLM Support
 
 **Why:**
 - Flexibility in model selection
 - Cost optimization (local Ollama for development)
-- Production readiness (Bedrock for deployment)
-- Experimentation (Gemini as alternative)
+- Cloud models (Gemini) and local models (Ollama)
 
 ---
 
@@ -323,22 +248,9 @@ Frontend displays report
 ```
 Frontend (localhost:5173) ← → Backend (localhost:8000)
                                     ↓
-                          Strands + AgentController (in-process)
+                          AgentController (in-process)
                                     ↓
                                 Playwright → Chromium
-```
-
-### Option 2: AgentCore Runtime (Production)
-```
-Frontend (Vercel/Netlify)
-    ↓
-Backend API (Cloud Run/ECS)
-    ↓
-Agent Controller + Playwright
-    ↑
-AgentCore Runtime (AWS)
-    ↓
-Strands Coordinator (Bedrock)
 ```
 
 ---
@@ -367,7 +279,6 @@ Strands Coordinator (Bedrock)
 ### Horizontal Scaling
 - Backend API can scale independently
 - Multiple Agent Controllers can run in parallel
-- Strands coordinator can orchestrate multiple runs
 
 ### Vertical Scaling
 - Playwright supports parallel browser contexts
@@ -375,7 +286,7 @@ Strands Coordinator (Bedrock)
 
 ### Cost Optimization
 - Local LLM support (Ollama) for development
-- Bedrock pay-per-use for production
+- Gemini for cloud model calls
 - Browser instances cleaned up automatically
 
 ---
@@ -386,8 +297,8 @@ Strands Coordinator (Bedrock)
 |-------|-----------|---------|
 | Frontend | React + TypeScript + Vite | User interface |
 | Backend | Python + FastAPI | REST API |
-| Orchestration | AWS Strands SDK | Agent coordination |
-| LLM | Amazon Bedrock Nova | Reasoning and planning |
+| QA engine | AgentController | Observe, plan, execute, report |
+| LLM | Chosen model (Gemini, Ollama, Mock) | Reasoning and planning |
 | Automation | Playwright | Browser control |
 | Runtime | Chromium | Browser execution |
 | Optional | Gemini/Ollama | Alternative LLM providers |
@@ -425,8 +336,6 @@ Strands Coordinator (Bedrock)
 
 ## Built With
 
-- **AWS Strands Agents SDK** - Agent orchestration framework
-- **Amazon Bedrock** - LLM reasoning and decision-making
 - **Playwright** - Browser automation
 - **FastAPI** - Backend REST API
 - **React** - Frontend user interface

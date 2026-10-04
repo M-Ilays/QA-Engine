@@ -4,12 +4,8 @@ from __future__ import annotations
 
 from app.config import get_settings
 from app.gemma.base import ActionGenerationRequest, GemmaProvider
-# Safe to import at module level: `bedrock_provider` imports no SDK of its own —
-# boto3 is imported inside `_build_client`, so a mock or openai_compatible
-# install never needs the Bedrock extra. Same arrangement as
-# `transformers_provider` and `gemini_provider`, which defer torch/google-genai
-# the same way.
-from app.gemma.bedrock_provider import BedrockProvider
+# Safe to import at module level: transformers and Gemini defer their SDKs
+# until the first generate call.
 from app.gemma.gemini_provider import GeminiProvider
 from app.gemma.health import get_active_health
 from app.gemma.mock_provider import MockGemmaProvider, StubGemmaProvider
@@ -78,30 +74,6 @@ def get_gemma_provider(*, force_new: bool = False) -> GemmaProvider:
                 provider.health.config_error
                 or "OpenAI-compatible Gemma provider is not configured"
             )
-    elif provider_name == "bedrock":
-        if not settings.aws_region or not settings.effective_bedrock_model_id:
-            raise RuntimeError(
-                "GEMMA_PROVIDER=bedrock requires AWS_REGION (e.g. us-east-1) and "
-                "BEDROCK_MODEL_ID (e.g. eu.anthropic.claude-sonnet-4-20250514-v1:0). "
-                "Refusing silent fallback to mock."
-            )
-        # Auth is NOT required here. An absent bearer token is legitimate when
-        # the standard AWS credential chain supplies SigV4 credentials (an
-        # instance role, a named profile), so refusing at this point would break
-        # a valid deployment. A genuinely missing credential surfaces at call
-        # time as the `missing_credentials` failure kind, which says so exactly.
-        # The auth MODE is logged; the token itself never is.
-        logger.info(
-            "Using BedrockProvider model=%s region=%s auth=%s",
-            settings.effective_bedrock_model_id,
-            settings.aws_region,
-            "bearer_token" if settings.bedrock_auth_configured else "aws_credential_chain",
-        )
-        provider = BedrockProvider()
-        if not provider.health.configured:
-            raise RuntimeError(
-                provider.health.config_error or "Bedrock provider is not configured"
-            )
     elif provider_name == "gemini":
         if not settings.effective_gemini_api_key:
             raise RuntimeError(
@@ -125,7 +97,7 @@ def get_gemma_provider(*, force_new: bool = False) -> GemmaProvider:
     else:
         raise RuntimeError(
             f"Unknown GEMMA_PROVIDER={settings.gemma_provider!r}. "
-            "Use mock | openai_compatible | transformers | bedrock | gemini. "
+            "Use mock | openai_compatible | transformers | gemini. "
             "Refusing silent fallback to mock."
         )
 
@@ -152,7 +124,6 @@ __all__ = [
     "StubGemmaProvider",
     "OpenAICompatibleGemmaProvider",
     "TransformersGemmaProvider",
-    "BedrockProvider",
     "GeminiProvider",
     "get_gemma_provider",
     "reset_gemma_provider",

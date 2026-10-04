@@ -253,3 +253,58 @@ async def test_no_gemma_provider_still_records_deterministic_findings() -> None:
     defects = await analyzer.analyze_page(page, "run-1")
     assert analyzer.gemma_bug_analysis_calls == 0
     assert any("HTTP 500" in d.title for d in defects)
+
+
+def _signup_form_page(**overrides) -> PageState:
+    form = FormDescriptor(
+        form_id="form_007",
+        fields=[
+            FormField(element_id="el_001", label="Email", field_type="email", required=True),
+        ],
+    )
+    return _page(
+        url="https://thinking-tester-contact-list.herokuapp.com/addUser",
+        forms=[form],
+        **overrides,
+    )
+
+
+def _submit_result() -> ActionResult:
+    return ActionResult(
+        action_id=new_id(),
+        run_id="run-1",
+        action=BrowserAction(
+            action=ActionType.CLICK,
+            element_id="el_005",
+            reason="Submit registration form to resolve authentication barrier.",
+            expected_result="Registration completes or validation is shown.",
+            metadata={"auth_submit": True},
+        ),
+        success=True,
+        before_url="https://thinking-tester-contact-list.herokuapp.com/addUser",
+        after_url="https://thinking-tester-contact-list.herokuapp.com/addUser",
+    )
+
+
+def test_submit_without_validation_message_is_a_bug() -> None:
+    analyzer = BugAnalyzer(gemma=None)
+    before = _signup_form_page()
+    after = _signup_form_page(alerts=[])
+    findings = analyzer.deterministic_signals(after, action_result=_submit_result(), before_state=before)
+    assert any("validation message not displayed" in f.title for f in findings)
+
+
+def test_submit_with_validation_message_is_not_a_bug() -> None:
+    analyzer = BugAnalyzer(gemma=None)
+    before = _signup_form_page()
+    after = _signup_form_page(alerts=["Email: Please fill out this field."])
+    findings = analyzer.deterministic_signals(after, action_result=_submit_result(), before_state=before)
+    assert not any("Validation message not displayed" in f.title for f in findings)
+
+
+def test_successful_navigation_does_not_require_a_validation_message() -> None:
+    analyzer = BugAnalyzer(gemma=None)
+    before = _signup_form_page()
+    after = _page(url="https://thinking-tester-contact-list.herokuapp.com/contactList", forms=[])
+    findings = analyzer.deterministic_signals(after, action_result=_submit_result(), before_state=before)
+    assert not any("Validation message not displayed" in f.title for f in findings)
