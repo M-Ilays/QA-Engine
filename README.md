@@ -9,7 +9,7 @@ QA Engine opens a real browser, explores the target, fills and submits forms, ex
 | **QA engine** | AgentController + Playwright |
 | **Browser** | Direct Playwright (Chromium) |
 | **Canonical demo** | [Thinking Tester Contact List](https://thinking-tester-contact-list.herokuapp.com/) |
-| **Source** | [github.com/M-Ilays/GemmaQA](https://github.com/M-Ilays/GemmaQA) |
+| **Source** | [github.com/M-Ilays/QA-Engine](https://github.com/M-Ilays/QA-Engine) |
 | **Optional model** | Google Gemini API (`GEMMA_PROVIDER=gemini`) |
 
 It does not fully test every screen of an application. **Only test systems you own or are explicitly authorized to test.**
